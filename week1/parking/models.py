@@ -5,7 +5,7 @@ class SlotState(str, Enum):
     FREE = "free"
     OCCUPIED = "occupied"
     RESERVED = "reserved"
-    ERROR = "error"
+    ILLEGAL = "illegal"
 
 # 车位实体
 @dataclass
@@ -15,19 +15,19 @@ class Slot:
     state: SlotState = SlotState.FREE
 
     def __str__(self):
-        return f"Slot {self.slot_id} in Zone {self.zone_id} is {self.state}"
+        return f"Slot {self.slot_id:02d} in Zone {self.zone_id} is {self.state}"
 
     def occupy(self):
         if self.state == SlotState.FREE:
             self.state = SlotState.OCCUPIED
         else:
-            raise ValueError(f"Cannot occupy slot {self.slot_id} because it is {self.state}")
+            raise ValueError(f"Cannot occupy slot {self.slot_id:02d} because it is {self.state}")
 
     def clear(self):
         if self.state in (SlotState.OCCUPIED, SlotState.RESERVED):
             self.state = SlotState.FREE
         else:
-            raise ValueError(f"Cannot clear slot {self.slot_id} because it is {self.state}")
+            raise ValueError(f"Cannot clear slot {self.slot_id:02d} because it is {self.state}")
 
 # 区域实体
 @dataclass
@@ -45,7 +45,7 @@ if __name__ == '__main__':
     print(slot1)
     slot1.occupy()
     print(slot1)
-    print(slot1.slot_id+8)
+    print(f"{slot1.slot_id+1:02d}")
     print(slot2)
     print(slot3)
     zone_A1 = Zone(zone_id='A1', name="地下A1区")
@@ -56,4 +56,4 @@ if __name__ == '__main__':
     print(SlotState.OCCUPIED.value)
     for slot in [slot1, slot2, slot3]:
         if slot.zone_id == zone_A1.zone_id and zone_A1.name == "地下A1区":
-            print(slot.slot_id)
+            print(f"{slot.slot_id:02d}")
