@@ -1,7 +1,8 @@
-from typing import Dict, List, Tuple, Optional
+from __future__ import annotations
+from typing import Dict, List, Tuple
 
-from models import Slot, Zone, SlotState
-from utils import log, log_error
+from .models import Slot, Zone, SlotState
+from .utils import log, log_error
 
 
 def seed_demo_data() -> Tuple[Dict[str, Zone], Dict[int, Slot]]:
@@ -52,7 +53,7 @@ def list_slots_by_zone(slots: Dict[int, Slot], zone_id: str) -> List[Slot]:
     return [slot for slot in slots.values() if slot.zone_id == zone_id]
 
 
-def list_free_slots(slots: Dict[int, Slot], zone_id: Optional[str] = None) -> List[Slot]:
+def list_free_slots(slots: Dict[int, Slot], zone_id: str | None = None) -> List[Slot]:
     """Returns all free slots, optionally filtered by zone."""
     res = []
     for slot in slots.values():
