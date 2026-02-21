@@ -1,0 +1,51 @@
+# Python字节码和缓存文件（必须忽略）
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# 虚拟环境（绝对要忽略！）
+venv/
+env/
+.venv/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE配置（根据你用的编辑器选择）
+## VS Code（关键！）
+.vscode/
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
+
+## PyCharm
+.idea/
+*.iml
+*.iws
+*.ipr
+
+## 其他编辑器
+.sublime-workspace
+.sublime-project
+*.sublime-*
+
+# 环境变量文件（包含敏感信息）
+.env
+.env.local
+.env.*.local
+
+# 日志和数据库
+*.log
+*.sqlite3
+*.db
+
+# 构建产物
+dist/
+build/
+*.egg-info/
+*.egg
