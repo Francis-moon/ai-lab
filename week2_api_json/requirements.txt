@@ -1,3 +1,5 @@
 # 2026/2/22:
-requests==2.32.5
-python-dotenv==1.1.0
+# requests==2.32.5 at HOME-AI
+# requests==2.22.0 at Thinkpad-X1c-work
+# python-dotenv==1.1.0 at HOME-AI
+# python-dotenv==0.21.1 at Thinkpad-X1c-work
