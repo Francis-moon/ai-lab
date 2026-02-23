@@ -66,6 +66,7 @@ class RepoInfo:
     forks: int
     open_issues: int
     description: Optional[str]
+    default_branch: Optional[str]
 
 def fetch_repo(owner: str, repo: str) -> RepoInfo:
     """
@@ -81,6 +82,7 @@ def fetch_repo(owner: str, repo: str) -> RepoInfo:
         forks=int(data["forks_count"]),
         open_issues=int(data["open_issues_count"]),
         description=data.get("description"),
+        default_branch=data.get("default_branch"),
     )
 
 
@@ -104,6 +106,7 @@ def search_repos(query: str, top_n: int = 5) -> Tuple[int, list[RepoInfo]]:
             forks=int(item["forks_count"]),
             open_issues=int(item["open_issues_count"]),
             description=item.get("description"),
+            default_branch=item.get("default_branch"),
         ))
     return total_count, repos
 

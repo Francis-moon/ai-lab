@@ -26,3 +26,35 @@ event = {"event": "IllegalParking", "target": "A-023", "ts": "..."}
 能用 JSON 组织“事件/任务/结果”数据
 能处理错误与限流（这是RaaS线上系统的基本功）
 这会直接对应你们“事件驱动 + 任务编排 + 闭环”路径（战略文档已明确这一点）
+
+🎯 第2周验收清单（严格版）
+请逐条确认：
+一、JSON能力
+□ 能解释 dict 与 JSON 的区别
+□ 能用 json.loads()
+□ 能用 json.dumps()
+□ 能从嵌套JSON中取值（如 data["items"][0]["name"]）
+
+二、HTTP能力
+□ 能解释 200 / 404 / 403 / 500 区别
+□ 能写 requests.get()
+□ 能使用 params 传参
+□ 能处理 timeout
+□ 能捕获异常（try/except）
+
+三、工具封装能力
+□ 能把API封装成函数（如 fetch_repo）
+□ 能返回结构化对象（dataclass）
+□ 能处理非200状态码
+□ 能写简单重试逻辑
+
+四、工程意识
+你必须能回答：
+为什么不能直接把 API 返回原样给上层？
+为什么要封装成 RepoInfo？
+为什么不能让 Agent 直接处理原始 JSON？
+
+正确理解应该是：
+上层逻辑不应该依赖外部API结构
+API变化不能影响业务层
+这叫“解耦”
