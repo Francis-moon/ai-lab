@@ -149,113 +149,84 @@ tools = [
 理解Tool Use机制
 
 第5周：状态机
-
 🎯 目标
 构建Slot状态系统。
 
 📚 学习资料
-
 Python状态机库：
-
 https://github.com/pytransitions/transitions
 
 🛠 实操
-
 pip install transitions
 
 定义状态：
-
 Free → Occupied → Illegal → Cleared
 
 🧪 练习
-
 定义状态转移规则
-
 触发事件改变状态
-
 打印状态变化日志
 
 完成标准：
-
 状态不可非法跳转
-
 理解事件驱动
 
 第6周：事件驱动系统
-
 🎯 目标
 实现：
-
 event → 状态更新 → 生成任务
 
 🛠 实操
-
 定义：
-
 class Event:
     def __init__(self, type, target):
         self.type = type
         self.target = target
 
 写事件循环：
-
 while events:
     handle_event(event)
 
 🧪 练习
 
 模拟IllegalParking事件
-
 自动生成Inspect任务
 
 完成标准：
-
 事件能驱动业务流程
 
 第7周：语义对象模型
-
 🎯 目标
 实现简化版 Parking Semantic Map。
 
 🛠 实操
-
 定义：
-
 class Lane
 class Zone
 class Slot
 
 维护关系：
-
 slot.zone = zoneA
 
 🧪 练习
-
 构建3个Zone
-
 每个Zone 5个Slot
-
 查询某Zone空闲车位
 
 完成标准：
-
 能进行对象级查询
 
 第8周：数据库存储
-
 🎯 目标
 把对象和状态存入数据库。
 
 📚 学习资料
 
 SQLite + SQLAlchemy
-
 https://docs.sqlalchemy.org/
 
 🛠 实操
-
 pip install sqlalchemy
-
 定义Slot表并存储状态。
 
 🧪 练习
