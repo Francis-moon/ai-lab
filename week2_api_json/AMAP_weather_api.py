@@ -24,19 +24,17 @@ def _get_amap_key() -> str:
     """
     从环境变量读取高德 Web 服务 Key。
     兼容常见变量名：
-    - AMAP_WEATHER_KEY
+    - AMAP_KEY
     - AMAP_API_KEY
-    - AMAP_whether_key（历史拼写）
     """
     key = (
-        os.getenv("AMAP_WEATHER_KEY", "").strip()
+        os.getenv("AMAP_Key", "").strip()
         or os.getenv("AMAP_API_KEY", "").strip()
-        or os.getenv("AMAP_whether_key", "").strip()
     )
     if not key:
         raise AMapWeatherAPIError(
             "未找到高德 API Key，请在 .env 或环境变量中设置 "
-            "`AMAP_WEATHER_KEY`（或 `AMAP_whether_key`）。"
+            "`AMAP_WEATHER_KEY`（或 `AMAP_key`）。"
         )
     return key
 
@@ -300,7 +298,7 @@ def pretty_print_weather(data: Dict[str, Any]) -> None:
 
 
 if __name__ == "__main__":
-    city_input = "丽江"  # 也可以传 adcode，例如 "110000"
+    city_input = input("请输入城市名称或adcode：")   # 也可以传 adcode，例如 "110000"
     try:
         result = get_weather(city_input)
         pretty_print_weather(result)

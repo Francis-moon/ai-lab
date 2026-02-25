@@ -1,8 +1,8 @@
 # Week3 - 调用大模型API（最小模板）
 
 1，创建虚拟环境
-python3 -m venv venv
-source venv/bin/activate
+conda create -n llm python=3.11
+conda activate llm
 2，安装依赖,
 pip install -r requirements.txt
 3，配置环境变量
