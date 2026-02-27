@@ -1,5 +1,4 @@
 ﻿import json
-import os
 from typing import Any, Dict
 from dotenv import load_dotenv
 from OpenAICompatibleClient import OpenAICompatibleClient
@@ -42,9 +41,8 @@ def main():
         return
 
     try:
-        # 优先兼容当前项目命名；也允许从 OPENAI_MODEL 透传
-        model = os.getenv("MODEL") or os.getenv("OPENAI_MODEL")
-        client = OpenAICompatibleClient(model=model)
+        # client = OpenAICompatibleClient(model=model)
+        client = OpenAICompatibleClient()
 
         plan = call_llm_make_plan(client, user_task)
         print("\n--- 结构化计划(JSON) ---")

@@ -1,22 +1,20 @@
-import os
-import re
+﻿import re
 import requests
 from openai import OpenAI
+from dotenv import load_dotenv
+import os
+
 
 # ============================
-# 1. 配置阿里云百炼API
+# 1. 配置大模型API
 # ============================
-# 请在阿里云百炼控制台获取以下信息
-BAILIAN_API_KEY = "sk-e7b67a626eba47dba08ebf1005cd46eb"  # 替换为你的百炼API密钥
-BAILIAN_BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1"  # 百炼API地址
-BAILIAN_MODEL = "qwen-max"  # 可选的模型：qwen-max, qwen-plus, qwen-turbo
+load_dotenv()  # 从 .env 文件加载环境变量
+API_KEY = os.getenv("API_KEY")  # API密钥
+BASE_URL = os.getenv("BASE_URL")  # API地址
+MODEL = os.getenv("MODEL")  # 模型名称
 
 # Tavily搜索API（可选，如果需要搜索功能）
-TAVILY_API_KEY = "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"  # 如果需要搜索功能，替换为你的Tavily密钥
-
-# 如果使用环境变量，取消下面行的注释
-# BAILIAN_API_KEY = os.environ.get("BAILIAN_API_KEY", "your-bailian-api-key-here")
-# TAVILY_API_KEY = os.environ.get("TAVILY_API_KEY", "your-tavily-api-key-here")
+TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")  # 搜索功能，Tavily密钥
 
 # ============================
 # 2. 定义系统提示词
@@ -177,23 +175,23 @@ available_tools = {
 
 
 # ============================
-# 4. 定义阿里云百炼LLM客户端
+# 4. 定义LLM客户端
 # ============================
-class BailianClient:
+class LLMClient:
     """
-    阿里云百炼LLM客户端，兼容OpenAI API格式。
+    LLM客户端，兼容OpenAI API格式。
     """
 
     def __init__(self, model: str, api_key: str, base_url: str):
-        self.model = model
         self.client = OpenAI(
-            api_key=api_key,
-            base_url=base_url
+            api_key=API_KEY,
+            base_url=BASE_URL
         )
+        self.model = MODEL
 
     def generate(self, prompt: str, system_prompt: str) -> str:
-        """调用百炼API生成回应。"""
-        print("正在调用阿里云百炼大语言模型...")
+        """调用LLM-API生成回应。"""
+        print(f"正在调用{self.model}大语言模型...")
         try:
             messages = [
                 {'role': 'system', 'content': system_prompt},
@@ -205,15 +203,18 @@ class BailianClient:
                 messages=messages,
                 stream=False,
                 temperature=0.1,  # 低温度保证输出格式稳定
-                max_tokens=500
+                max_tokens=300,
+                reasoning_effort="low", 
+                extra_body={"reasoning_split": True}
             )
 
+
             answer = response.choices[0].message.content
-            print("百炼模型响应成功。")
+            print("LLM模型响应成功。")
             return answer
 
         except Exception as e:
-            print(f"调用百炼API时发生错误：{e}")
+            print(f"调用LLM API时发生错误：{e}")
             return f"错误：调用语言模型服务时出错 - {str(e)}"
 
 
@@ -221,24 +222,9 @@ class BailianClient:
 # 5. 主循环实现
 # ============================
 def main():
-    # --- 1. 配置百炼客户端 ---
-    API_KEY = BAILIAN_API_KEY
-    BASE_URL = BAILIAN_BASE_URL
-    MODEL_ID = BAILIAN_MODEL
-
-    # 检查API密钥是否已设置
-    if API_KEY == "your-bailian-api-key-here":
-        print("⚠️ 警告：请先配置阿里云百炼API密钥！")
-        print("步骤：")
-        print("1. 访问 https://bailian.console.aliyun.com/")
-        print("2. 创建应用并获取API密钥")
-        print("3. 将代码中的 BAILIAN_API_KEY 替换为你的实际密钥")
-        print("\n本次将使用模拟模式演示流程。")
-        run_demo_mode()
-        return
-
-    llm = BailianClient(
-        model=MODEL_ID,
+    # --- 1. 配置LLM客户端 ---
+    llm = LLMClient(
+        model=MODEL,
         api_key=API_KEY,
         base_url=BASE_URL
     )
@@ -254,7 +240,7 @@ def main():
     print(f"用户输入: {user_prompt}\n" + "=" * 40)
 
     # --- 3. 运行主循环 ---
-    max_cycles = 5
+    max_cycles = 3
     for i in range(max_cycles):  # 设置最大循环次数
         print(f"\n--- 循环 {i + 1}/{max_cycles} ---")
 
@@ -286,7 +272,7 @@ def main():
                 finish_match = re.search(r'finish\(answer=(.*)\)', action_str, re.DOTALL)
             if finish_match:
                 final_answer = finish_match.group(1).strip('"')
-                print(f"✅ 任务完成！")
+                print(f"任务完成！")
                 print(f"最终答案: {final_answer}")
                 break
             else:
@@ -294,7 +280,7 @@ def main():
                 quote_match = re.search(r'"([^"]*)"', action_str)
                 if quote_match:
                     final_answer = quote_match.group(1)
-                    print(f"✅ 任务完成！")
+                    print(f"任务完成！")
                     print(f"最终答案: {final_answer}")
                     break
                 else:
@@ -335,7 +321,7 @@ def main():
 
         # 执行工具调用
         if tool_name in available_tools:
-            print(f"🛠️ 执行工具: {tool_name}({kwargs})")
+            print(f"执行工具: {tool_name}({kwargs})")
             try:
                 observation = available_tools[tool_name](**kwargs)
             except Exception as e:
@@ -345,80 +331,13 @@ def main():
 
         # 3.4. 记录观察结果
         observation_str = f"Observation: {observation}"
-        print(f"📝 {observation_str}\n" + "=" * 40)
+        print(f"{observation_str}\n" + "=" * 40)
         prompt_history.append(observation_str)
 
     else:
-        print(f"⚠️ 已达到最大循环次数({max_cycles})，任务未完成。")
+        print(f"已达到最大循环次数({max_cycles})，任务未完成。")
 
     print("\n智能体执行结束！")
-
-
-# ============================
-# 6. 演示模式（无API密钥时使用）
-# ============================
-def run_demo_mode():
-    """
-    演示模式，不调用真实API，展示智能体工作流程。
-    """
-    print("\n=== 演示模式：智能旅行助手工作流程 ===")
-
-    user_prompt = "你好，请帮我查询一下今天北京的天气，然后根据天气推荐一个合适的旅游景点。"
-    print(f"用户输入: {user_prompt}")
-    print("=" * 50)
-
-    # 模拟第一次循环
-    print("\n--- 循环 1 ---")
-    thought1 = "首先需要获取北京今天的天气情况，之后再根据天气情况来推荐旅游景点。"
-    action1 = 'get_weather(city="北京")'
-    print(f"Thought: {thought1}")
-    print(f"Action: {action1}")
-
-    # 模拟天气查询结果
-    weather_result = get_weather_simulated("北京")
-    print(f"Observation: {weather_result}")
-
-    # 模拟第二次循环
-    print("\n--- 循环 2 ---")
-    thought2 = "现在已经知道了北京今天的天气是晴朗且温度适中，接下来可以基于这个信息来推荐一个适合的旅游景点了。"
-    action2 = 'get_attraction(city="北京", weather="晴朗")'
-    print(f"Thought: {thought2}")
-    print(f"Action: {action2}")
-
-    # 模拟景点推荐结果
-    attraction_result = get_attraction_simulated("北京", "晴朗")
-    print(f"Observation: {attraction_result}")
-
-    # 模拟第三次循环
-    print("\n--- 循环 3 ---")
-    thought3 = "已经获得了适合晴天游览的景点建议，现在可以根据这些信息给用户提供满意的答复。"
-    action3 = 'finish(answer="今天北京的天气是晴朗的，气温26摄氏度，非常适合外出游玩。我推荐您去颐和园欣赏美丽的湖景和古建筑，或者前往长城体验其壮观的景观和深厚的历史意义。希望您有一个愉快的旅行！")'
-    print(f"Thought: {thought3}")
-    print(f"Action: {action3}")
-
-    print("\n✅ 任务完成！")
-    print(
-        "最终答案: 今天北京的天气是晴朗的，气温26摄氏度，非常适合外出游玩。我推荐您去颐和园欣赏美丽的湖景和古建筑，或者前往长城体验其壮观的景观和深厚的历史意义。希望您有一个愉快的旅行！")
-
-
-def get_weather_simulated(city: str) -> str:
-    """模拟天气查询"""
-    if city == "北京":
-        return "北京当前天气: 晴朗, 气温26摄氏度"
-    elif city == "上海":
-        return "上海当前天气: 多云, 气温22摄氏度"
-    else:
-        return f"{city}当前天气: 晴朗, 气温25摄氏度"
-
-
-def get_attraction_simulated(city: str, weather: str) -> str:
-    """模拟景点推荐"""
-    if city == "北京" and "晴朗" in weather:
-        return "北京在晴天最值得去的旅游景点是颐和园，因其美丽的湖景和古建筑。另一个推荐是长城，因其壮观的景观和历史意义。"
-    elif city == "上海":
-        return "上海在多云天气推荐游览外滩、东方明珠和豫园。"
-    else:
-        return f"根据{weather}天气，推荐您游览{city}的著名景点。"
 
 
 # ============================
@@ -426,12 +345,12 @@ def get_attraction_simulated(city: str, weather: str) -> str:
 # ============================
 if __name__ == "__main__":
     print("=" * 60)
-    print("智能旅行助手 - 阿里云百炼Qwen3版本")
+    print(f"智能旅行助手 - LLM版本")
     print("=" * 60)
 
     # 检查API密钥配置
-    if BAILIAN_API_KEY == "your-bailian-api-key-here":
-        print("⚠️ 检测到未配置阿里云百炼API密钥")
+    if not API_KEY or API_KEY == "your-api-key-here":
+        print("检测到未配置LLM-API密钥")
         print("运行模式选择:")
         print("1. 演示模式（无API调用，展示流程）")
         print("2. 配置模式（指导如何配置API）")
@@ -439,19 +358,16 @@ if __name__ == "__main__":
         choice = input("\n请选择 (1 或 2): ").strip()
 
         if choice == "2":
-            print("\n配置阿里云百炼API步骤:")
-            print("1. 访问 https://bailian.console.aliyun.com/")
-            print("2. 登录阿里云账号")
-            print("3. 在控制台创建应用")
-            print("4. 获取API密钥")
-            print("5. 修改代码中的以下变量:")
-            print("   - BAILIAN_API_KEY = '你的API密钥'")
-            print("   - BAILIAN_MODEL = 'qwen-max' (或其他模型)")
+            print("\n配置LLM-API步骤:")
+            print("   .env中配置API_KEY, BASE_URL和MODEL")
             print("\n然后重新运行程序。")
         else:
-            run_demo_mode()
+            raise SystemExit("请配置API密钥后再运行程序。")
     else:
-        print("✅ 检测到已配置阿里云百炼API密钥")
-        print(f"模型: {BAILIAN_MODEL}")
+        print("检测到已LLM-API密钥")
+        load_dotenv
+        model = os.getenv("MODEL")
+        print(f"模型: {model}")
         print("\n开始运行智能旅行助手...")
         main()
+
