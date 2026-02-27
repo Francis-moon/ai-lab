@@ -278,6 +278,8 @@ def main():
                     final_answer = json.loads(f'"{raw_answer}"')
                 except Exception:
                     final_answer = raw_answer.replace("\\n", "\n").replace('\\"', '"')
+                # 兜底处理双转义换行，确保最终输出按行展示
+                final_answer = final_answer.replace("\\\\n", "\n").replace("\\n", "\n")
                 print("任务完成！")
                 print(f"最终答案:\n{final_answer}")
                 break
@@ -285,7 +287,7 @@ def main():
             partial_match = re.search(r'finish\s*\(\s*answer\s*=\s*"(.*)$', action_str, re.DOTALL)
             if partial_match:
                 raw_answer = partial_match.group(1).strip()
-                final_answer = raw_answer.replace("\\n", "\n").replace('\\"', '"')
+                final_answer = raw_answer.replace("\\\\n", "\n").replace("\\n", "\n").replace('\\"', '"')
                 print("任务完成！（检测到模型输出可能被截断）")
                 print(f"最终答案:\n{final_answer}")
                 break
