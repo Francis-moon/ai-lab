@@ -203,7 +203,7 @@ class LLMClient:
                 messages=messages,
                 stream=False,
                 temperature=0.1,  # 低温度保证输出格式稳定
-                max_tokens=300,
+                max_tokens=800,
                 reasoning_effort="low", 
                 extra_body={"reasoning_split": True}
             )
@@ -252,40 +252,46 @@ def main():
         print(f"模型输出:\n{llm_output}\n")
         prompt_history.append(llm_output)
 
-        # 3.3. 解析并执行行动
-        action_match = re.search(r"Action:\s*(.*)", llm_output, re.DOTALL)
-        if not action_match:
+        # 3.3. 解析并执行行动：提取最后一个 Action，避免多 Action 时串台
+        action_candidates = re.findall(
+            r"Action[:：]\s*(.*?)(?=\n(?:Thought|Observation|Action)[:：]|\Z)",
+            llm_output,
+            re.DOTALL
+        )
+        if not action_candidates:
             print("解析错误: 模型输出中未找到 Action.")
-            # 尝试其他可能的格式
-            action_match = re.search(r"Action：\s*(.*)", llm_output, re.DOTALL)
-            if not action_match:
-                break
+            break
 
-        action_str = action_match.group(1).strip()
+        action_str = action_candidates[-1].strip()
 
         # 检查是否为完成指令
         if "finish" in action_str.lower():
-            # 使用正则表达式提取最终答案
-            finish_match = re.search(r'finish\(answer="(.*)"\)', action_str, re.DOTALL)
-            if not finish_match:
-                # 尝试其他格式
-                finish_match = re.search(r'finish\(answer=(.*)\)', action_str, re.DOTALL)
+            finish_match = re.search(
+                r'finish\s*\(\s*answer\s*=\s*"((?:\\.|[^"\\])*)"\s*\)',
+                action_str,
+                re.DOTALL
+            )
             if finish_match:
-                final_answer = finish_match.group(1).strip('"')
-                print(f"任务完成！")
-                print(f"最终答案: {final_answer}")
+                raw_answer = finish_match.group(1)
+                try:
+                    import json
+                    final_answer = json.loads(f'"{raw_answer}"')
+                except Exception:
+                    final_answer = raw_answer.replace("\\n", "\n").replace('\\"', '"')
+                print("任务完成！")
+                print(f"最终答案:\n{final_answer}")
                 break
-            else:
-                # 直接提取引号内的内容
-                quote_match = re.search(r'"([^"]*)"', action_str)
-                if quote_match:
-                    final_answer = quote_match.group(1)
-                    print(f"任务完成！")
-                    print(f"最终答案: {final_answer}")
-                    break
-                else:
-                    print(f"完成指令格式无法解析: {action_str}")
-                    break
+
+            partial_match = re.search(r'finish\s*\(\s*answer\s*=\s*"(.*)$', action_str, re.DOTALL)
+            if partial_match:
+                raw_answer = partial_match.group(1).strip()
+                final_answer = raw_answer.replace("\\n", "\n").replace('\\"', '"')
+                print("任务完成！（检测到模型输出可能被截断）")
+                print(f"最终答案:\n{final_answer}")
+                break
+
+            print(f"完成指令格式无法解析: {action_str}")
+            break
 
         # 解析工具调用
         # 匹配模式: tool_name(arg_name="arg_value")
