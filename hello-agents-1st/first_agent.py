@@ -3,6 +3,7 @@ import requests
 from openai import OpenAI
 from dotenv import load_dotenv
 import os
+from datetime import datetime
 
 
 # ============================
@@ -23,8 +24,9 @@ AGENT_SYSTEM_PROMPT = """
 你是一个智能旅行助手。你的任务是分析用户的请求，并使用可用工具一步步地解决问题。
 
 # 可用工具：
-- 'get_weather(city: str)': 查询指定城市的实时天气。
+- 'get_weather(city: str, day_option: str)': 查询指定城市在指定日期（a/b/c）的天气。
 - 'get_attraction(city: str, weather: str)': 根据城市和天气搜索推荐的旅游景点。
+a=今天，b=明天，c=后天。
 
 # 行动格式：
 你的回答必须严格遵循以下格式。首先是你的思考过程，然后是你要执行的具体行动。
@@ -33,6 +35,7 @@ Action: [这里是你要调用的工具，格式为 function_name(arg_name="arg_
 
 # 任务完成：
 当你收集到足够的信息，能够回答用户的最终问题时，你必须在 'Action:' 字段后使用 'finish(answer="...")' 来输出最终答案。
+日期必须以工具 Observation 中返回的“查询日期”为准，不得自行编造或猜测日期。
 
 请开始吧！
 """
@@ -42,36 +45,75 @@ Action: [这里是你要调用的工具，格式为 function_name(arg_name="arg_
 # 3. 定义工具函数
 # ============================
 
-def get_weather(city: str) -> str:
+def get_weather(city: str, day_option: str = "a") -> str:
     """
-    通过调用 wttr.in API 查询真实的天气信息。
-    这是一个免费的天气API，无需API密钥。
+    通过调用 wttr.in API 查询真实天气。
+    day_option: a=今天, b=明天, c=后天。
+    说明：
+    - wttr 可能把城市名解析到其他地点，因此返回里会附带“解析到的地点”。
+    - 若解析到的地点与输入不一致，可优先改用英文城市名或经纬度。
     """
-    # API端点，我们请求JSON格式的数据
-    url = f"https://wttr.in/{city}?format=j1"
+    from urllib.parse import quote
+
+    city = city.strip()
+    if not city:
+        return "错误: 城市名称不能为空。"
+
+    day_map = {"a": 0, "b": 1, "c": 2}
+    day_label_map = {"a": "今天", "b": "明天", "c": "后天"}
+    opt = (day_option or "a").strip().lower()
+    if opt not in day_map:
+        return "错误: day_option 仅支持 a(今天) / b(明天) / c(后天)。"
+
+    day_idx = day_map[opt]
+    day_label = day_label_map[opt]
+
+    city_q = quote(city)
+    url = f"https://wttr.in/{city_q}?format=j1&lang=zh"
+    headers = {"User-Agent": "travel-agent-weather/1.0"}
 
     try:
-        # 发起网络请求
-        response = requests.get(url, timeout=10)
-        # 检查响应状态码是否为200（成功）
+        response = requests.get(url, headers=headers, timeout=10)
         response.raise_for_status()
-        # 解析返回的JSON数据
         data = response.json()
 
-        # 提取当前天气状况
-        current_condition = data['current_condition'][0]
-        weather_desc = current_condition['weatherDesc'][0]['value']
-        temp_c = current_condition['temp_C']
+        current_condition = data["current_condition"][0]
+        obs_time = current_condition.get("localObsDateTime", "未知观测时间")
+        query_date = datetime.now().astimezone().strftime("%Y-%m-%d")
+        weather_days = data.get("weather", [])
+        if len(weather_days) <= day_idx:
+            return f"错误: 天气数据中缺少{day_label}信息，请稍后重试。"
 
-        # 格式化成自然语言返回
-        return f"{city}当前天气: {weather_desc}, 气温{temp_c}摄氏度"
+        day_weather = weather_days[day_idx]
+        day_date = day_weather.get("date", "未知日期")
+        min_temp_c = day_weather.get("mintempC", "未知")
+        max_temp_c = day_weather.get("maxtempC", "未知")
+        avg_temp_c = day_weather.get("avgtempC", "未知")
+        hourly_list = day_weather.get("hourly", [])
+        day_desc = "未知天气"
+        if hourly_list:
+            mid_idx = min(len(hourly_list) - 1, 4)
+            day_desc = hourly_list[mid_idx].get("weatherDesc", [{}])[0].get("value", "未知天气")
+
+        nearest = data.get("nearest_area", [{}])[0]
+        resolved_city = nearest.get("areaName", [{}])[0].get("value", "未知地点")
+        resolved_country = nearest.get("country", [{}])[0].get("value", "未知国家")
+
+        mismatch_note = ""
+        if city.lower() not in resolved_city.lower():
+            mismatch_note = "（提示: 地名解析可能不一致，建议改用英文城市名或经纬度）"
+
+        return (
+            f"{city}{day_label}天气（{day_date}）: {day_desc}。"
+            f"全天温度: {min_temp_c}~{max_temp_c}摄氏度（均温约{avg_temp_c}摄氏度）。"
+            f"查询日期: {query_date}。观测时间: {obs_time}。"
+            f"解析地点: {resolved_city}, {resolved_country}{mismatch_note}"
+        )
 
     except requests.exceptions.RequestException as e:
-        # 处理网络错误
         return f"错误: 查询天气时遇到网络问题 - {e}"
-    except (KeyError, IndexError) as e:
-        # 处理数据解析错误
-        return f"错误: 解析天气数据失败，可能是城市名称无效 - {e}"
+    except (KeyError, IndexError, ValueError) as e:
+        return f"错误: 解析天气数据失败 - {e}"
 
 
 def get_attraction_simple(city: str, weather: str) -> str:
@@ -260,7 +302,20 @@ def main():
         print("城市不能为空。")
         return
 
-    user_prompt = f"你好，请帮我查询一下今天{city}的天气，然后根据天气推荐一个合适的旅游景点。"
+    print("请选择查询日期: a) 今天  b) 明天  c) 后天")
+    day_option = input("请输入选项(a/b/c): ").strip().lower()
+    if day_option not in {"a", "b", "c"}:
+        print("无效选项，默认使用 a（今天）。")
+        day_option = "a"
+
+    day_label_map = {"a": "今天", "b": "明天", "c": "后天"}
+    day_label = day_label_map[day_option]
+    today = datetime.now().astimezone().strftime("%Y-%m-%d")
+    user_prompt = (
+        f"你好，请帮我查询一下{today}（系统当前日期）对应的{day_label}{city}天气，"
+        f"并根据天气推荐一个合适的旅游景点。"
+        f"请使用工具调用：get_weather(city=\"{city}\", day_option=\"{day_option}\")。"
+    )
     prompt_history = [f"用户请求: {user_prompt}"]
     print(f"用户输入: {user_prompt}\n" + "=" * 40)
 
@@ -405,4 +460,5 @@ if __name__ == "__main__":
         print(f"模型: {model}")
         print("\n开始运行智能旅行助手...")
         main()
+
 
