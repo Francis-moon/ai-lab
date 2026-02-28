@@ -174,6 +174,31 @@ available_tools = {
 }
 
 
+def format_llm_output_for_display(llm_output: str) -> str:
+    """
+    仅用于终端展示：
+    若包含 finish(answer="...")，将 answer 中的转义换行解码为真实换行，
+    方便阅读，不影响后续解析逻辑。
+    """
+    match = re.search(r'finish\s*\(\s*answer\s*=\s*"(.*)"\s*\)\s*$', llm_output, re.DOTALL)
+    if not match:
+        return llm_output
+
+    raw_answer = match.group(1)
+    try:
+        import json
+        decoded_answer = json.loads(f'"{raw_answer}"')
+    except Exception:
+        decoded_answer = raw_answer.replace("\\\\n", "\n").replace("\\n", "\n").replace('\\"', '"')
+
+    # 统一兜底，避免双转义场景下仍显示 \n
+    decoded_answer = decoded_answer.replace("\\\\n", "\n").replace("\\n", "\n")
+    pretty_finish = f'finish(answer="""\n{decoded_answer}\n""")'
+
+    start, end = match.span()
+    return llm_output[:start] + pretty_finish + llm_output[end:]
+
+
 # ============================
 # 4. 定义LLM客户端
 # ============================
@@ -249,7 +274,8 @@ def main():
 
         # 3.2. 调用LLM进行思考
         llm_output = llm.generate(full_prompt, system_prompt=AGENT_SYSTEM_PROMPT)
-        print(f"模型输出:\n{llm_output}\n")
+        display_output = format_llm_output_for_display(llm_output)
+        print(f"模型输出:\n{display_output}\n")
         prompt_history.append(llm_output)
 
         # 3.3. 解析并执行行动：提取最后一个 Action，避免多 Action 时串台
@@ -266,8 +292,9 @@ def main():
 
         # 检查是否为完成指令
         if "finish" in action_str.lower():
+            # 使用贪婪匹配提取 answer，兼容答案中出现未转义双引号的情况
             finish_match = re.search(
-                r'finish\s*\(\s*answer\s*=\s*"((?:\\.|[^"\\])*)"\s*\)',
+                r'finish\s*\(\s*answer\s*=\s*"(.*)"\s*\)\s*$',
                 action_str,
                 re.DOTALL
             )
