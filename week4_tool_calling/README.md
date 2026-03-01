@@ -6,6 +6,8 @@
 
 核心点2：为什么用 previous_response_id
 它让第二次请求“接着第一次的上下文继续”，形成一次任务的多轮执行闭环。
+Responses API 用 previous_response_id 串联；
+Chat Completions 用 messages[] 串联（把assistant/tool消息都塞回 messages）
 
 核心点3：为什么强制 json_object
 你后面要接状态机/事件系统/数据库，必须保证输出可解析。Structured/JSON 输出是官方推荐能力方向。
@@ -22,3 +24,5 @@
 期望：至少调用 inspect_slot(A12)，输出包含 evidence/log id。
 把 tools.py 里 B12 状态改成 Free
 期望：模型策略变化（可能不取证，改成巡检/结束）。
+
+完成期望：模型自己根据车位的状态（slot state），自己调整策略。
