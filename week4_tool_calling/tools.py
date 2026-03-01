@@ -1,4 +1,4 @@
-from typing import Dict, Any
+﻿from typing import Dict, Any
 from datetime import datetime
 
 # 模拟：从“空间对象数据库/语义地图”里查看车位状态
@@ -16,16 +16,33 @@ def get_slot_state(slot_id: int) -> Dict[int, Any]:
     return {
         "slot_id": slot_id,
         "found": True,
-}
+    }
 
 
 def inspect_slot(slot_id: int) -> Dict[int, Any]:
     # 真实系统里：可能触发机器人巡检/调用车位相机等
     now = datetime.now().isoformat()
+    state_info = _FAKE_SLOT_STATE.get(slot_id)
+
+    if not state_info:
+        return {
+            "slot_id": slot_id,
+            "found": False,
+            "action": "inspect",
+            "result": "failed",
+            "state": "Unknown",
+            "evidence": None,
+            "timestamp": now,
+        }
+
     return {
         "slot_id": slot_id,
+        "found": True,
         "action": "inspect",
         "result": "success",
+        "state": state_info["state"],
+        "zone": state_info["zone"],
+        "state_last_updated": state_info["last_updated"],
         "evidence": f"inspection_log_{slot_id}_{now}",
         "timestamp": now,
     }
@@ -48,4 +65,5 @@ if __name__ == "__main__":
     print(get_slot_state(1))
     print(get_slot_state(6))
     print(inspect_slot(8))
+    print(inspect_slot(12))
     print(capture_evidence(12, "Illegal parking"))

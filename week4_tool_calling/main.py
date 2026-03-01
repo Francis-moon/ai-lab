@@ -26,7 +26,8 @@ def must_get_env(name: str) -> str:
 # ============================
 def build_tools_spec() -> List[Dict[str, Any]]:
     """
-    定义可被模型调用的本地工具（JSON Schema）。
+    定义可被模型调用的本地工具规格（JSON Schema）。
+    告诉模型有哪些工具可用，每个工具的功能是什么，需要什么参数。
     注意：name 必须和 tools.py 中函数名一致。
     """
     return [
@@ -88,15 +89,15 @@ def _coerce_slot_id(arguments: Dict[str, Any]) -> Dict[str, Any]:
 
 def execute_local_tool(name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
     """
-    按名称执行 tools.py 里的本地函数，并将错误包装为结构化返回。
+    按名称执行 tools.py 里的本地函数，并将结果包装为结构化返回给模型。
     """
-    fn = getattr(local_tools, name, None)
+    fn = getattr(local_tools, name, None)    #根据名字找到tools.py中对应的函数
     if fn is None:
         return {"error": f"Unknown tool: {name}"}
 
     try:
         safe_args = _coerce_slot_id(arguments or {})
-        return fn(**safe_args)
+        return fn(**safe_args)   #把模型传来的参数解包成函数参数来调用
     except TypeError as e:
         return {"error": f"Bad arguments for {name}: {e}"}
     except Exception as e:
@@ -142,10 +143,17 @@ def run_agent_with_tools(client: OpenAI, model: str, user_task: str) -> Dict[str
     """
     tools_spec = build_tools_spec()
     system_prompt = (
-        "你是停车场运营任务代理。你可以调用工具完成巡检与取证。"
-        "请先判断是否需要调用工具；如需要，必须调用。"
-        "最终只输出 JSON 对象，格式为："
-        '{"goal": string, "tool_calls": [...], "final_steps": [...], "success_criteria": [...]}。'
+        "你是停车场运营任务代理Agent。你可以调用工具完成巡检与取证。"
+        "1)请先判断是否需要调用工具（查询状态/巡检/取证）。"
+        "2)如需要，必须调用，拿到结果后继续推理。"
+        "3)最终只输出 JSON 对象（不要夹带多余文字），格式为："
+        "最终JSON格式：\n"
+        "{\n"
+        '  "goal": string,\n'
+        '  "tool_calls": [ { "name": string, "arguments": object, "tool_result": object } ],\n'
+        '  "final_steps": [ { "id": number, "action": string, "target": string, "expected_output": string } ],\n'
+        '  "success_criteria": [string]\n'
+        "}\n"
     )
 
     messages: List[Dict[str, Any]] = [
@@ -195,6 +203,7 @@ def run_agent_with_tools(client: OpenAI, model: str, user_task: str) -> Dict[str
                     arguments = {"_raw": raw_args}
 
                 result = execute_local_tool(name, arguments)
+                # 把调用过程写入 tool_calls_log（便于审计/回放，“证据链”）
                 tool_calls_log.append(
                     {"name": name, "arguments": arguments, "tool_result": result}
                 )
