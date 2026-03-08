@@ -182,13 +182,11 @@ class Event:
     def __init__(self, type, target):
         self.type = type
         self.target = target
-
 写事件循环：
 while events:
     handle_event(event)
 
 🧪 练习
-
 模拟IllegalParking事件
 自动生成Inspect任务
 
