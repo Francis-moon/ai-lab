@@ -28,18 +28,21 @@ Lane 的状态做 3 个：CLEAR / BLOCKED / CLEARED
 事件：block / clear / release / reset
 跑 demo
 意义：对应你们文档里的典型事件 LaneBlocked。
+**Finished**
 
 练习2：把“clear”拆成两步（更贴近闭环）
 把 ILLEGAL -> CLEARED 改成：
 ILLEGAL -> CLEARED（取证完成）
 CLEARED -> FREE（复核通过）
-你已经在模板里实现了这个语义（clear/release）。你要做的是：
+已经在模板里实现了这个语义（clear/release）。你要做的是：
 在 clear 时强制 evidence 必填；没 evidence 就 raise ValueError
+**Finished, and ts change to china timezone**
 
 练习3：把 history 输出成 JSON 文件
 新增 export_history(slot_id).json：
 文件名：history_A-23.json
 内容：history 列表（ts/event/from/to/note）
+**Finished, only SLOT no LANE**
 
 这周做完，你在“Spatial OS”里对应掌握了什么
 你将掌握战略文档中 Parking Spatial OS 的一根主梁：

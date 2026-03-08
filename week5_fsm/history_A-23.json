@@ -1,0 +1,30 @@
+[
+  {
+    "ts": "2026-03-08T22:15:42+08:00",
+    "event": "occupy",
+    "from": "FREE",
+    "to": "OCCUPIED",
+    "note": ""
+  },
+  {
+    "ts": "2026-03-08T22:15:42+08:00",
+    "event": "detect_illegal",
+    "from": "OCCUPIED",
+    "to": "ILLEGAL",
+    "note": "illegal_reason=blacklist_plate"
+  },
+  {
+    "ts": "2026-03-08T22:15:42+08:00",
+    "event": "clear",
+    "from": "ILLEGAL",
+    "to": "CLEARED",
+    "note": "evidence_keys=['img_url', 'ts']"
+  },
+  {
+    "ts": "2026-03-08T22:15:42+08:00",
+    "event": "release",
+    "from": "CLEARED",
+    "to": "FREE",
+    "note": ""
+  }
+]
