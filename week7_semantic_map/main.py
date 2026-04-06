@@ -62,17 +62,6 @@ def main():
     # 先打印地图
     semantic_map.show_map_summary()
 
-    # 对象关系问答：输入 Slot-A01，输出所属Lane/Zone和当前状态
-    qa_result = semantic_map.ask_slot_relation("Slot-A01")
-    print("\n=== 对象关系问答 ===")
-    if qa_result:
-        print(f"输入: {qa_result['slot_id']}")
-        print(f"属于Lane: {qa_result['lane_id']}")
-        print(f"属于Zone: {qa_result['zone_id']}")
-        print(f"当前状态: {qa_result['slot_state']}")
-    else:
-        print("未找到Slot: Slot-A01")
-
     # 查询A区空闲车位
     free_slots_a = semantic_map.get_free_slots_by_zone("Zone-A")
     print("\n=== A区空闲车位 ===")
