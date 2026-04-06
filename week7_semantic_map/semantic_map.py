@@ -1,5 +1,5 @@
 from typing import Dict, List, Optional
-from models import Zone, Lane, Slot, SlotState
+from models import Zone, Lane, Slot, SlotState, SlotType
 
 
 class SemanticMap:
@@ -67,11 +67,51 @@ class SemanticMap:
             return None
         return self.get_lane(slot.lane_id)
 
+    def ask_slot_relation(self, slot_id: str) -> Optional[Dict[str, str]]:
+        slot = self.get_slot(slot_id)
+        if not slot:
+            return None
+
+        lane = self.get_lane_of_slot(slot_id)
+        zone = self.get_zone_of_slot(slot_id)
+
+        return {
+            "slot_id": slot.slot_id,
+            "lane_id": lane.lane_id if lane else "N/A",
+            "zone_id": zone.zone_id if zone else "N/A",
+            "slot_state": slot.state.value,
+        }
+
+    def ask_slot_relation_interactive(self):
+        raw_input = input("\n请输入车位号 Slot-: ").strip()
+        if not raw_input:
+            print("输入为空，请重新运行后输入车位号。")
+            return
+
+        slot_id = raw_input if raw_input.startswith("Slot-") else f"Slot-{raw_input}"
+        qa_result = self.ask_slot_relation(slot_id)
+
+        if not qa_result:
+            print(f"未找到车位: {slot_id}")
+            return
+
+        print("\n=== 对象关系问答结果 ===")
+        print(f"输入: {qa_result['slot_id']}")
+        print(f"属于Lane: {qa_result['lane_id']}")
+        print(f"属于Zone: {qa_result['zone_id']}")
+        print(f"当前状态: {qa_result['slot_state']}")
+
     # ===== 业务查询 =====
     def get_free_slots_by_zone(self, zone_id: str) -> List[Slot]:
         return [
             slot for slot in self.get_slots_by_zone(zone_id)
             if slot.state == SlotState.FREE
+        ]
+
+    def get_free_charging_slots_by_zone(self, zone_id: str) -> List[Slot]:
+        return [
+            slot for slot in self.get_slots_by_zone(zone_id)
+            if slot.state == SlotState.FREE and slot.slot_type == SlotType.CHARGING
         ]
 
     def get_illegal_slots(self) -> List[Slot]:
@@ -86,10 +126,13 @@ class SemanticMap:
             print(f"[Zone] {zone.zone_id} - {zone.name}")
             lanes = self.get_lanes_by_zone(zone.zone_id)
             for lane in lanes:
-                print(f"  [Lane] {lane.lane_id} - {lane.name} - state={lane.state}")
+                print(
+                    f"  [Lane] {lane.lane_id} - {lane.name} - "
+                    f"direction={lane.direction.value} - state={lane.state.value}"
+                )
                 slots = self.get_slots_by_lane(lane.lane_id)
                 for slot in slots:
                     print(
                         f"    [Slot] {slot.slot_id} - "
-                        f"type={slot.slot_type} - state={slot.state}"
+                        f"type={slot.slot_type.value} - state={slot.state.value}"
                     )

@@ -57,5 +57,23 @@ def handle_event_rules(system, event):
         else:
             print(f"Lane对象暂不支持事件: {event.event_type}")
 
+    elif event.target_type == TargetType.ZONE:
+        zone = semantic_map.get_zone(event.target_id)
+        if not zone:
+            print(f"未找到Zone: {event.target_id}")
+            return
+
+        if event.event_type == EventType.ZONE_BLOCKED:
+            lanes = semantic_map.get_lanes_by_zone(zone.zone_id)
+            if not lanes:
+                print(f"Zone下无Lane可巡检: {zone.zone_id}")
+                return
+
+            for lane in lanes:
+                system.create_task(TaskType.INSPECT, TargetType.LANE, lane.lane_id)
+
+        else:
+            print(f"Zone对象暂不支持事件: {event.event_type}")
+
     else:
         print(f"暂不支持的target_type: {event.target_type}")

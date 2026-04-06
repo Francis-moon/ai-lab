@@ -13,15 +13,28 @@ class SlotState(str, Enum):
     RESOLVED = "RESOLVED"
 
 
+class SlotType(str, Enum):
+    NORMAL = "NORMAL"
+    VIP = "VIP"
+    CHARGING = "CHARGING"
+
+
 class LaneState(str, Enum):
     NORMAL = "NORMAL"
     BLOCKED = "BLOCKED"
+
+
+class LaneDirection(str, Enum):
+    FORWARD = "FORWARD"
+    REVERSE = "REVERSE"
+    BIDIRECTIONAL = "BIDIRECTIONAL"
 
 
 class EventType(str, Enum):
     SLOT_OCCUPIED = "SlotOccupied"
     ILLEGAL_PARKING = "IllegalParking"
     LANE_BLOCKED = "LaneBlocked"
+    ZONE_BLOCKED = "ZoneBlocked"
     EVIDENCE_CAPTURED = "EvidenceCaptured"
     CLEARED = "Cleared"
 
@@ -78,10 +91,20 @@ class Lane:
     lane_id: str
     zone_id: str
     name: str
-    direction: str = "BIDIRECTIONAL"
+    direction: LaneDirection = LaneDirection.BIDIRECTIONAL
     state: LaneState = LaneState.NORMAL
     slot_ids: List[str] = field(default_factory=list)
     history: List[str] = field(default_factory=list)
+
+    def __post_init__(self):
+        if isinstance(self.direction, str):
+            try:
+                self.direction = LaneDirection(self.direction)
+            except ValueError as e:
+                raise ValueError(
+                    f"非法Lane方向: {self.direction}, 可选值: "
+                    f"{[d.value for d in LaneDirection]}"
+                ) from e
 
     def update_state(self, new_state: LaneState):
         old_state = self.state
@@ -96,7 +119,7 @@ class Slot:
     slot_id: str
     lane_id: str
     zone_id: str
-    slot_type: str = "NORMAL"
+    slot_type: SlotType = SlotType.NORMAL
     state: SlotState = SlotState.FREE
     history: List[str] = field(default_factory=list)
 
