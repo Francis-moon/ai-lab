@@ -1,4 +1,5 @@
-一个 12周（3个月）实操型学习路线。
+# 一个 12周（3个月）实操型学习路线。
+
 目标非常明确：
 3个月后，你可以独立搭建一个“类 Parking Spatial OS 的简化版 Agent 系统原型”。
 
@@ -17,7 +18,7 @@ Python + FastAPI + OpenAI API + LangGraph + SQLite
 阶段二（5–8周）：状态机 + 事件系统 + 语义对象
 阶段三（9–12周）：多Agent调度 + 闭环系统
 
-第1周：恢复Python能力
+## 第1周：恢复Python能力
 🎯 目标
 掌握Python基础语法，能写函数、类、简单逻辑。
 
@@ -53,7 +54,8 @@ class Slot:
 无报错
 能理解类与函数区别
 
-第2周：API与JSON
+## 第2周：API与JSON
+
 🎯 目标
 理解API调用与JSON数据结构。
 📚 学习资料
@@ -81,7 +83,8 @@ print(response.json())
 能理解JSON字典结构
 能用response.json()["key"]
 
-第3周：调用大模型API
+## 第3周：调用大模型API
+
 🎯 目标
 能调用OpenAI API并得到回复。
 
@@ -114,7 +117,8 @@ print(response.choices[0].message.content)
 能稳定调用API
 能打印模型回复
 
-第4周：Tool Calling（Agent雏形）
+## 第4周：Tool Calling（Agent雏形）
+
 🎯 目标
 理解LLM调用工具。
 
@@ -148,7 +152,8 @@ tools = [
 模型能自动选择工具
 理解Tool Use机制
 
-第5周：状态机
+## 第5周：状态机
+
 🎯 目标
 构建Slot状态系统。
 
@@ -171,7 +176,8 @@ Free → Occupied → Illegal → Cleared
 状态不可非法跳转
 理解事件驱动
 
-第6周：事件驱动系统
+## 第6周：事件驱动系统
+
 🎯 目标
 实现：
 event → 状态更新 → 生成任务
@@ -193,7 +199,8 @@ while events:
 完成标准：
 事件能驱动业务流程
 
-第7周：语义对象模型
+## 第7周：语义对象模型
+
 🎯 目标
 实现简化版 Parking Semantic Map。
 
@@ -214,12 +221,12 @@ slot.zone = zoneA
 完成标准：
 能进行对象级查询
 
-第8周：数据库存储
+## 第8周：数据库存储
+
 🎯 目标
 把对象和状态存入数据库。
 
 📚 学习资料
-
 SQLite + SQLAlchemy
 https://docs.sqlalchemy.org/
 
@@ -228,69 +235,51 @@ pip install sqlalchemy
 定义Slot表并存储状态。
 
 🧪 练习
-
 插入100个Slot
-
 更新状态
-
 查询历史记录
 
 完成标准：
-
 数据持久化成功
 
-第9周：FastAPI接口层
+## 第9周：FastAPI接口层
 
 🎯 目标
 构建简单API服务。
 
 📚 学习资料
-
 https://fastapi.tiangolo.com/
 
 🛠 实操
-
 pip install fastapi uvicorn
 
 创建接口：
-
 @app.get("/slots")
 
 🧪 练习
-
 查询所有Slot
-
 修改Slot状态
 
 完成标准：
-
 浏览器能访问API
 
-第10周：LangGraph（真正Agent系统）
+## 第10周：LangGraph（真正Agent系统）
 
 🎯 目标
 构建有状态Agent流程。
 
 📚 学习资料
-
 LangGraph：
-
 https://langchain-ai.github.io/langgraph/
 
 🛠 实操
-
 构建Graph：
-
 Planner → Tool → UpdateState → End
 
 🧪 练习
-
 实现完整流程：
-
 输入巡检 → 生成任务 → 更新状态
-
 完成标准：
-
 形成闭环
 
 第11周：多Agent模拟
