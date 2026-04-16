@@ -54,22 +54,18 @@ lane_id
 ## 1. Base.metadata.create_all(bind=engine)
 
 作用：按你定义的模型自动建表。
-
 这是 ORM 最基本的一步。
 
 ## 2. SessionLocal()
 
 作用：拿到数据库会话，相当于这次数据库操作的“上下文”。
-
 你所有增删改查，都是通过 db 来做。
 
 ## 3. db.add() + db.commit()
 
 作用：
-
 add()：把对象放进待写入队列
 commit()：真正提交到数据库
-
 没有 commit()，数据库里不会真正落地。
 
 ## 4. db.query(...)

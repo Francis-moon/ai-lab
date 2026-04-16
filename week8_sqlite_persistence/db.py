@@ -5,7 +5,7 @@ DATABASE_URL = "sqlite:///parking.db"
 
 engine = create_engine(
     DATABASE_URL,
-    echo=True,   # True 会打印 SQL，初学时可改成 True 看执行过程
+    echo=False,   # True 会打印 SQL，初学时可改成 True 看执行过程
     future=True
 )
 
