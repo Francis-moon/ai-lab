@@ -1,7 +1,15 @@
 # 2026/2/22: python=3.11 
 # pip install -r requirements.txt
-requests>=2.32.5
-python-dotenv>=1.1.0
-openai>=1.40.0
-tavily-python
-transitions>=0.9.0
+requests>=2.32,<3
+python-dotenv>=1.2,<2
+openai>=2.3
+tavily-python>=0.7.20
+transitions>=0.9,<1
+sqlalchemy>=2.0.45,<2.1
+fastapi>=0.135
+uvicorn>=0.44
+pydantic>=2.11
+pytest>=9.0,<10
+langgraph>=1.1,<2
+langchain-core>=1.2
+langchain-openai>=1.1
