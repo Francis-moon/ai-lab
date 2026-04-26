@@ -1,4 +1,6 @@
 # 核心部分
+from typing import Dict, Optional, Set
+
 from sqlalchemy.orm import Session
 from .models import Task, Executor
 from .constants import (
@@ -30,7 +32,13 @@ def executor_can_handle(executor: Executor, task_type: str):
     return task_type in supported
 
 
-def get_available_executors(db: Session, zone: str, executor_type: str, task_type: str):
+def get_available_executors(
+    db: Session,
+    zone: str,
+    executor_type: str,
+    task_type: str,
+    excluded_executor_ids: Optional[Set[str]] = None,
+):
     candidates = db.query(Executor).filter(
         Executor.zone == zone,
         Executor.executor_type == executor_type,
@@ -39,11 +47,17 @@ def get_available_executors(db: Session, zone: str, executor_type: str, task_typ
 
     result = []
     for e in candidates:
+        if excluded_executor_ids and e.executor_id in excluded_executor_ids:
+            continue
         if e.status != EXECUTOR_STATUS_IDLE:
             continue
         if not executor_can_handle(e, task_type):
             continue
-        if e.executor_type == "robot" and (e.battery_level is None or e.battery_level < ROBOT_BATTERY_LOW_THRESHOLD):
+        if (
+            e.executor_type == "robot"
+            and task_type != "charge_robot"
+            and (e.battery_level is None or e.battery_level <= ROBOT_BATTERY_LOW_THRESHOLD)
+        ):
             continue
         result.append(e)
     return result
@@ -64,12 +78,12 @@ def ensure_robot_charging_task(db: Session, robot: Executor):
     if robot.executor_type != "robot":
         return None
 
-    if robot.battery_level is None or robot.battery_level >= ROBOT_BATTERY_LOW_THRESHOLD:
+    if robot.battery_level is None or robot.battery_level > ROBOT_BATTERY_LOW_THRESHOLD:
         return None
 
     existing = db.query(Task).filter(
+        Task.task_id == f"charge-{robot.executor_id}",
         Task.task_type == "charge_robot",
-        Task.assigned_executor_id == robot.executor_id,
         Task.status.in_(["created", "assigned", "in_progress"])
     ).first()
     if existing:
@@ -107,7 +121,10 @@ def assign_task_to_executor(db: Session, task: Task, executor: Executor):
     return task, executor
 
 
-def schedule_pending_tasks(db: Session):
+def schedule_pending_tasks(
+    db: Session,
+    task_excluded_executors: Optional[Dict[str, Set[str]]] = None,
+):
     # 先扫描低电量机器人，自动生成充电任务
     robots = db.query(Executor).filter(Executor.executor_type == "robot", Executor.online == True).all()
     for robot in robots:
@@ -119,11 +136,21 @@ def schedule_pending_tasks(db: Session):
     scheduling_results = []
 
     for task in pending_tasks:
+        excluded_executor_ids = None
+        if task_excluded_executors:
+            excluded_executor_ids = task_excluded_executors.get(task.task_id)
+
         chain = parse_fallback_chain(task.fallback_chain)
         assigned = False
 
         for executor_type in chain:
-            candidates = get_available_executors(db, task.zone, executor_type, task.task_type)
+            candidates = get_available_executors(
+                db,
+                task.zone,
+                executor_type,
+                task.task_type,
+                excluded_executor_ids=excluded_executor_ids,
+            )
 
             # 简单策略：同区优先，选第一个
             if candidates:
@@ -199,7 +226,11 @@ def fail_task_with_fallback(db: Session, task_id: str):
     db.commit()
 
     # 重新调度，走 fallback 链
-    results = schedule_pending_tasks(db)
+    excluded = None
+    if old_executor:
+        excluded = {task.task_id: {old_executor.executor_id}}
+
+    results = schedule_pending_tasks(db, task_excluded_executors=excluded)
     return {
         "task_id": task.task_id,
         "status": "requeued",

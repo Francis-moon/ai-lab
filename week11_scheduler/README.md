@@ -123,8 +123,8 @@ POST /tasks/manual-test-001/fail
 
 预期：
 老执行体释放
-任务重新回到 created
 scheduler 自动重新分配
+任务分配给其他executor
 若 robot 不合适，则 fallback 给 human 或 cloud_operator
 这一步验证了：
 fallback 机制
@@ -200,6 +200,7 @@ can_handle
 所以这句逻辑虽然简单，但极重要：
 executor.current_task_id = None
 executor.status = "idle"
+
 核心点4：低电量自动充电，是机器人系统和人工系统最大的区别
 人类不会因为电量不足退出系统，机器人会。
 因此机器人调度一定要多一层：
@@ -219,6 +220,7 @@ fallback 是默认设计，不是例外。
 
 核心点6：热度和 SLA 让系统从“静态派单”升级为“动态优先级系统”
 你现在有了两种很关键的维度：
+
 1. 区域热度 zone_heat
 表示这个区域当前更值得调度资源。
 
@@ -279,6 +281,7 @@ Operational Twin 最小内核。
 ## 这版的局限
 
 我直接指出来，避免你误判。
+
 1. 还没有真实时间流逝
 现在 SLA 只是任务属性，还没有真正做超时计时器。
 
