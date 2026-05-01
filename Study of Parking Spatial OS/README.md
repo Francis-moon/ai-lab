@@ -1,7 +1,7 @@
-# 一个 12周（3个月）实操型学习路线。
+# Parking Spatial OS简化版12周实操型学习路线
 
 目标非常明确：
-3个月后，你可以独立搭建一个“类 Parking Spatial OS 的简化版 Agent 系统原型”。
+3个月后，你可以独立搭建一个“类Parking Spatial OS的简化版 Agent 系统原型”。
 
 每周都包含：
 🎯 本周目标
@@ -19,6 +19,7 @@ Python + FastAPI + OpenAI API + LangGraph + SQLite
 阶段三（9–12周）：多Agent调度 + 闭环系统
 
 ## 第1周：恢复Python能力
+
 🎯 目标
 掌握Python基础语法，能写函数、类、简单逻辑。
 
@@ -282,39 +283,28 @@ Planner → Tool → UpdateState → End
 完成标准：
 形成闭环
 
-第11周：多Agent模拟
+## 第11周：多Agent模拟
 
 🎯 目标
 模拟3个机器人调度。
-
 🛠 实操
-
 定义：
-
 class Robot:
     battery
     current_task
-
 写调度函数：
-
 优先级排序
-
 电量判断
 
 🧪 练习
-
 模拟：
-
 10任务
 3机器人
-
 输出调度日志。
-
 完成标准：
-
 无冲突执行
 
-第12周：整合成简化Spatial OS
+## 第12周：整合成简化Spatial OS
 
 🎯 目标
 整合：
@@ -333,8 +323,7 @@ API接口
 多机器人分配
 状态实时更新
 可查询数据库
-可API调用
-的完整小系统。
+可API调用的完整小系统。
 
 每周学习时间
 建议：
