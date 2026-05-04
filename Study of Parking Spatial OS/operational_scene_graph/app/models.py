@@ -159,3 +159,104 @@ class AuditLog(Base):
     detail = Column(String)
 
     created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class EventCorrelation(Base):
+    __tablename__ = "event_correlations"
+
+    id = Column(Integer, primary_key=True)
+
+    correlation_id = Column(String, unique=True, index=True)
+    event_id = Column(String, index=True)
+    case_id = Column(String, index=True)
+
+    relation_type = Column(String)
+    # duplicate / supports / contradicts / escalates / same_vehicle / same_area
+
+    score = Column(Integer, default=0)
+    reason = Column(String, nullable=True)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class SLAViolation(Base):
+    __tablename__ = "sla_violations"
+
+    id = Column(Integer, primary_key=True)
+
+    violation_id = Column(String, unique=True, index=True)
+    task_id = Column(String, index=True)
+    case_id = Column(String, index=True)
+
+    violation_type = Column(String)
+    # not_assigned_timeout / not_completed_timeout / executor_offline
+
+    severity = Column(String, default="medium")
+    action_taken = Column(String, nullable=True)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class FeedbackRecord(Base):
+    __tablename__ = "feedback_records"
+
+    id = Column(Integer, primary_key=True)
+
+    feedback_id = Column(String, unique=True, index=True)
+    case_id = Column(String, index=True)
+    task_id = Column(String, nullable=True)
+
+    feedback_type = Column(String)
+    # true_positive / false_positive / duplicate / map_error / camera_blindspot / rule_error
+
+    root_cause = Column(String, nullable=True)
+    note = Column(String, nullable=True)
+    created_by = Column(String)
+
+    attrs = Column(JSON, default=dict)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class MapPatch(Base):
+    __tablename__ = "map_patches"
+
+    id = Column(Integer, primary_key=True)
+
+    patch_id = Column(String, unique=True, index=True)
+    target_node_id = Column(String, index=True)
+
+    patch_type = Column(String)
+    # update_node_state / update_attrs / add_edge / remove_edge / mark_blindspot
+
+    payload = Column(JSON, default=dict)
+
+    status = Column(String, default="proposed")
+    # proposed / applied / rejected
+
+    source_case_id = Column(String, nullable=True)
+    proposed_by = Column(String, default="system")
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    applied_at = Column(DateTime, nullable=True)
+
+
+class RiskProfile(Base):
+    __tablename__ = "risk_profiles"
+
+    id = Column(Integer, primary_key=True)
+
+    profile_id = Column(String, unique=True, index=True)
+    target_node_id = Column(String, index=True)
+    zone = Column(String, index=True)
+
+    risk_score = Column(Float, default=0.0)
+
+    true_positive_count = Column(Integer, default=0)
+    false_positive_count = Column(Integer, default=0)
+    duplicate_count = Column(Integer, default=0)
+    sla_violation_count = Column(Integer, default=0)
+
+    attrs = Column(JSON, default=dict)
+
+    updated_at = Column(DateTime, default=datetime.utcnow)

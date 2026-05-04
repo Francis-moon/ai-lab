@@ -43,3 +43,23 @@ class TaskOutcomeCreate(BaseModel):
     evidence_url: Optional[str] = None
     note: Optional[str] = None
     created_by: str = "cloud_operator"
+
+
+class FeedbackCreate(BaseModel):
+    feedback_id: str
+    case_id: str
+    task_id: Optional[str] = None
+    feedback_type: str
+    root_cause: Optional[str] = None
+    note: Optional[str] = None
+    created_by: str = "operator"
+    attrs: Dict[str, Any] = {}
+
+
+class MapPatchCreate(BaseModel):
+    patch_id: str
+    target_node_id: str
+    patch_type: str
+    payload: Dict[str, Any] = {}
+    source_case_id: Optional[str] = None
+    proposed_by: str = "system"
