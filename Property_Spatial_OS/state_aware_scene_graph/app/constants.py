@@ -1,9 +1,14 @@
+REL_HYPOTHESIS = "hypothesis"
+REL_CONFIRMED = "confirmed"
+REL_REJECTED = "rejected"
+REL_WEAKENED = "weakened"
+REL_EXPIRED = "expired"
+
 CASE_SUSPECTED = "suspected"
 CASE_VERIFYING = "verifying"
 CASE_CONFIRMED = "confirmed"
-CASE_WAITING = "waiting"
-CASE_ESCALATED = "escalated"
 CASE_CLOSED = "closed"
+CASE_ESCALATED = "escalated"
 
 TASK_CREATED = "created"
 TASK_ASSIGNED = "assigned"

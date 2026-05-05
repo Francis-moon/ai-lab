@@ -1,4 +1,6 @@
-# Operational Scene Graph = 空间对象 + 关系 + 状态 + 事件 + 任务 + 证据 + 执行反馈
+# state_aware_operational_graph(v3 SAOG)
+
+Operational Scene Graph = 空间对象 + 关系 + 状态 + 事件 + 任务 + 证据 + 执行反馈
 
 ## 正确定位
 
@@ -40,6 +42,34 @@ Graph Update + Audit Replay
 换句话说：
 Scene Graph 是空间记忆层；Case Engine 是运营状态机；Scheduler 是执行调度层。
 三者不能混在一起。
+
+不是推翻 V2，而是在 V2 的 Scene Graph 基础上，把 state-aware 下沉到 Relation / Edge 层。
+
+MomaGraph 的启发点正是：任务相关图不只是有节点和边，还要根据执行后的状态变化确认、削弱或剪枝关系边；论文里 knob 与 burner 的例子就是通过动作后的状态变化确认真实 control 边、剪掉错误边。
+这和宜泊现在“事件状态机 + 调度内核 + 空间状态模型”的方向一致，但 V3 进一步把“状态感知”从 Event / Case / Task 下沉到 Scene Graph 的关系层。
+
+## V3 相比 V2 的核心变化
+
+V2：operational_scene_graph
+主要回答：
+事件是什么？
+Case 到哪一步？
+任务派给谁？
+执行结果是什么？
+对象状态如何变化？
+
+V3：state_aware_operational_graph
+进一步回答：
+哪些空间关系被验证了？
+哪些功能关系被削弱了？
+哪些边是疑似关系？
+哪些边因误报被剪枝？
+哪些关系会影响下一步调度？
+
+也就是从：
+Case-aware / Task-aware
+升级到：
+Relation-aware / Edge-aware
 
 ## 运行步骤
 
