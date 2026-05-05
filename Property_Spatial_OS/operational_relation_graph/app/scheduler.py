@@ -2,7 +2,14 @@ from sqlalchemy.orm import Session
 
 from .models import Task, Executor
 from .audit import write_audit
-from .constants import TASK_CREATED, TASK_ASSIGNED, EXECUTOR_IDLE, EXECUTOR_BUSY
+from .scene_graph import update_node_state, confirm_relation
+from .constants import (
+    TASK_CREATED,
+    TASK_ASSIGNED,
+    EXECUTOR_IDLE,
+    EXECUTOR_BUSY,
+    REL_ASSIGNED_TO
+)
 
 
 PRIORITY_SCORE = {
@@ -18,11 +25,14 @@ def parse_chain(chain: str):
 
 
 def executor_can_handle(executor: Executor, task_type: str):
-    return task_type in [x.strip() for x in executor.can_handle.split(",")]
+    supported = [x.strip() for x in executor.can_handle.split(",") if x.strip()]
+    return task_type in supported
 
 
 def task_score(task: Task):
-    return PRIORITY_SCORE.get(task.priority, 0) + max(0, 60 - task.sla_minutes)
+    priority_score = PRIORITY_SCORE.get(task.priority, 0)
+    sla_score = max(0, 60 - task.sla_minutes)
+    return priority_score + sla_score
 
 
 def find_executor(db: Session, task: Task):
@@ -34,15 +44,18 @@ def find_executor(db: Session, task: Task):
             Executor.online == True
         ).all()
 
-        for e in candidates:
-            if executor_can_handle(e, task.task_type):
-                return e
+        for executor in candidates:
+            if executor_can_handle(executor, task.task_type):
+                return executor
 
     return None
 
 
 def run_scheduler(db: Session):
-    tasks = db.query(Task).filter(Task.status == TASK_CREATED).all()
+    tasks = db.query(Task).filter(
+        Task.status == TASK_CREATED
+    ).all()
+
     tasks = sorted(tasks, key=task_score, reverse=True)
 
     results = []
@@ -64,6 +77,32 @@ def run_scheduler(db: Session):
         executor.current_task_id = task.task_id
 
         db.commit()
+
+        update_node_state(
+            db,
+            f"task:{task.task_id}",
+            TASK_ASSIGNED,
+            confidence=100
+        )
+
+        update_node_state(
+            db,
+            f"executor:{executor.executor_id}",
+            EXECUTOR_BUSY,
+            confidence=100
+        )
+
+        confirm_relation(
+            db=db,
+            source_node_id=f"executor:{executor.executor_id}",
+            target_node_id=f"task:{task.task_id}",
+            relation_type=REL_ASSIGNED_TO,
+            confidence=100,
+            created_by="scheduler",
+            task_id=task.task_id,
+            case_id=task.case_id,
+            note="scheduler assigned executor to task"
+        )
 
         write_audit(
             db,

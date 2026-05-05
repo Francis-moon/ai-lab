@@ -2,54 +2,62 @@ from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from .database import Base, engine, get_db
-from .models import SceneNode, SceneEdge, Event, Case, Task, TaskOutcome, Executor, AuditLog, EventCorrelation, SLAViolation, MapPatch, FeedbackRecord, RiskProfile
-from .schemas import SceneNodeCreate, SceneEdgeCreate, EventCreate, TaskOutcomeCreate, FeedbackCreate, MapPatchCreate, RelationHypothesisCreate, RelationUpdateRequest
-from .sla_engine import check_task_sla
-from .feedback_engine import submit_feedback
-from .map_patch import apply_map_patch, reject_map_patch, propose_map_patch
-from .metrics_engine import get_operational_metrics, get_top_risk_nodes
-from .scene_graph import upsert_node, add_edge, get_neighborhood
-from .case_engine import ingest_event_and_create_case, handle_task_outcome
-from .scheduler import run_scheduler
-from .relation_engine import (
-    upsert_relation_hypothesis,
-    confirm_relation,
-    reject_relation,
-    expire_stale_hypotheses,
+from .models import (
+    SceneNode,
+    SceneEdge,
+    RelationEvidence,
+    Event,
+    Case,
+    Task,
+    TaskOutcome,
+    Executor,
+    AuditLog
 )
-from .subgraph_extractor import extract_case_subgraph
+from .schemas import (
+    SceneNodeCreate,
+    SceneEdgeCreate,
+    EventCreate,
+    TaskOutcomeCreate
+)
+from .scene_graph import (
+    upsert_node,
+    upsert_relation,
+    get_neighborhood,
+    get_case_relevant_subgraph
+)
+from .case_engine import (
+    ingest_event_and_create_case,
+    handle_task_outcome
+)
+from .scheduler import run_scheduler
 
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
-    title="EboTech state-aware Scene Graph",
-    version="V3.0", 
+    title="Yibo Operational Relation Graph",
+    version="3.0.0"
 )
 
 
 @app.get("/")
 def root():
     return {
-        "message": "Operational Scene Graph Twin is running"
+        "message": "V3 Operational Relation Graph is running"
     }
 
 
+# -------------------------
+# Scene Graph API
+# -------------------------
 @app.post("/scene/nodes")
 def create_or_update_node(payload: SceneNodeCreate, db: Session = Depends(get_db)):
     node = upsert_node(db, payload)
+
     return {
         "node_id": node.node_id,
         "node_type": node.node_type,
-        "state": node.state
-    }
-
-
-@app.post("/scene/edges")
-def create_edge(payload: SceneEdgeCreate, db: Session = Depends(get_db)):
-    edge = add_edge(db, payload)
-    return {
-        "edge_id": edge.edge_id,
-        "relation_type": edge.relation_type
+        "state": node.state,
+        "confidence": node.confidence
     }
 
 
@@ -58,16 +66,56 @@ def list_nodes(db: Session = Depends(get_db)):
     return db.query(SceneNode).all()
 
 
+@app.post("/scene/edges")
+def create_or_update_edge(payload: SceneEdgeCreate, db: Session = Depends(get_db)):
+    edge = upsert_relation(
+        db=db,
+        source_node_id=payload.source_node_id,
+        target_node_id=payload.target_node_id,
+        relation_type=payload.relation_type,
+        relation_state=payload.relation_state,
+        confidence=payload.confidence,
+        created_by=payload.created_by,
+        source_event_id=payload.source_event_id,
+        attrs=payload.attrs,
+        evidence_signal="neutral",
+        evidence_note="manual edge upsert"
+    )
+
+    return {
+        "edge_id": edge.edge_id,
+        "relation_type": edge.relation_type,
+        "relation_state": edge.relation_state,
+        "confidence": edge.confidence
+    }
+
+
 @app.get("/scene/edges")
 def list_edges(db: Session = Depends(get_db)):
     return db.query(SceneEdge).all()
 
 
+@app.get("/scene/evidence")
+def list_relation_evidence(db: Session = Depends(get_db)):
+    return db.query(RelationEvidence).order_by(RelationEvidence.id.desc()).all()
+
+
 @app.get("/scene/neighborhood/{node_id:path}")
-def node_neighborhood(node_id: str, db: Session = Depends(get_db)):
+def neighborhood(node_id: str, db: Session = Depends(get_db)):
     return get_neighborhood(db, node_id)
 
 
+@app.get("/scene/case-subgraph/{case_id}")
+def case_subgraph(case_id: str, db: Session = Depends(get_db)):
+    try:
+        return get_case_relevant_subgraph(db, case_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+# -------------------------
+# Event / Case API
+# -------------------------
 @app.post("/events/ingest")
 def ingest_event(payload: EventCreate, db: Session = Depends(get_db)):
     return ingest_event_and_create_case(db, payload)
@@ -83,6 +131,19 @@ def list_cases(db: Session = Depends(get_db)):
     return db.query(Case).order_by(Case.id.desc()).all()
 
 
+@app.get("/cases/{case_id}")
+def get_case(case_id: str, db: Session = Depends(get_db)):
+    case = db.query(Case).filter(Case.case_id == case_id).first()
+
+    if not case:
+        raise HTTPException(status_code=404, detail="Case not found")
+
+    return case
+
+
+# -------------------------
+# Task / Outcome API
+# -------------------------
 @app.get("/tasks")
 def list_tasks(db: Session = Depends(get_db)):
     return db.query(Task).order_by(Task.id.desc()).all()
@@ -106,11 +167,17 @@ def list_outcomes(db: Session = Depends(get_db)):
     return db.query(TaskOutcome).order_by(TaskOutcome.id.desc()).all()
 
 
+# -------------------------
+# Executor API
+# -------------------------
 @app.get("/executors")
 def list_executors(db: Session = Depends(get_db)):
     return db.query(Executor).all()
 
 
+# -------------------------
+# Audit / Replay API
+# -------------------------
 @app.get("/audit")
 def list_audit(db: Session = Depends(get_db)):
     return db.query(AuditLog).order_by(AuditLog.id.desc()).all()
@@ -122,79 +189,3 @@ def replay(entity_type: str, entity_id: str, db: Session = Depends(get_db)):
         AuditLog.entity_type == entity_type,
         AuditLog.entity_id == entity_id
     ).order_by(AuditLog.id.asc()).all()
-
-
-@app.post("/sla/check")
-def sla_check_api(db: Session = Depends(get_db)):
-    return check_task_sla(db)
-
-
-@app.get("/correlations")
-def list_correlations(db: Session = Depends(get_db)):
-    return db.query(EventCorrelation).order_by(EventCorrelation.id.desc()).all()
-
-
-@app.get("/sla/violations")
-def list_sla_violations(db: Session = Depends(get_db)):
-    return db.query(SLAViolation).order_by(SLAViolation.id.desc()).all()
-
-
-@app.post("/feedback")
-def submit_feedback_api(payload: FeedbackCreate, db: Session = Depends(get_db)):
-    try:
-        return submit_feedback(db, payload)
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-
-
-@app.get("/feedback")
-def list_feedback(db: Session = Depends(get_db)):
-    return db.query(FeedbackRecord).order_by(FeedbackRecord.id.desc()).all()
-
-
-@app.post("/map-patches")
-def propose_map_patch_api(payload: MapPatchCreate, db: Session = Depends(get_db)):
-    patch = propose_map_patch(
-        db=db,
-        target_node_id=payload.target_node_id,
-        patch_type=payload.patch_type,
-        payload=payload.payload,
-        source_case_id=payload.source_case_id,
-        proposed_by=payload.proposed_by
-    )
-
-    return {
-        "patch_id": patch.patch_id,
-        "status": patch.status
-    }
-
-
-@app.get("/map-patches")
-def list_map_patches(db: Session = Depends(get_db)):
-    return db.query(MapPatch).order_by(MapPatch.id.desc()).all()
-
-
-@app.post("/map-patches/{patch_id}/apply")
-def apply_map_patch_api(patch_id: str, db: Session = Depends(get_db)):
-    try:
-        return apply_map_patch(db, patch_id)
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-
-
-@app.post("/map-patches/{patch_id}/reject")
-def reject_map_patch_api(patch_id: str, reason: str, db: Session = Depends(get_db)):
-    try:
-        return reject_map_patch(db, patch_id, reason)
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-
-
-@app.get("/metrics")
-def metrics_api(db: Session = Depends(get_db)):
-    return get_operational_metrics(db)
-
-
-@app.get("/risk-profiles")
-def risk_profiles_api(db: Session = Depends(get_db)):
-    return get_top_risk_nodes(db)
