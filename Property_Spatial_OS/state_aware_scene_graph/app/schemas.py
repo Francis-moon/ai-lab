@@ -25,10 +25,14 @@ class SceneEdgeCreate(BaseModel):
     attrs: Dict[str, Any] = {}
 
 
+from typing import Optional, Dict, Any
+from pydantic import BaseModel
+
+
 class EventCreate(BaseModel):
     event_id: str
     event_type: str
-    source: str     # ai_box、cloud_operator、robot 等
+    source: str
     source_node_id: Optional[str] = None
     target_node_id: Optional[str] = None
     zone: str
@@ -40,9 +44,27 @@ class TaskOutcomeCreate(BaseModel):
     task_id: str
     outcome_type: str
     confidence: int = 80
-    evidence_url: Optional[str] = None
     note: Optional[str] = None
     created_by: str = "cloud_operator"
+
+
+class RelationHypothesisCreate(BaseModel):
+    source_node_id: str
+    relation_type: str
+    target_node_id: str
+    confidence: int = 50
+    created_by: str = "system"
+    source_type: str = "manual_config"
+    source_id: str = "manual"
+    detail: str = ""
+
+
+class RelationUpdateRequest(BaseModel):
+    source_type: str = "manual"
+    source_id: str = "manual"
+    created_by: str = "operator"
+    confidence: int = 90
+    detail: str = ""
 
 
 class FeedbackCreate(BaseModel):

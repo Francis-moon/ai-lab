@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 
 from .database import Base, engine, get_db
 from .models import SceneNode, SceneEdge, Event, Case, Task, TaskOutcome, Executor, AuditLog, EventCorrelation, SLAViolation, MapPatch, FeedbackRecord, RiskProfile
-from .schemas import SceneNodeCreate, SceneEdgeCreate, EventCreate, TaskOutcomeCreate, FeedbackCreate, MapPatchCreate
+from .schemas import SceneNodeCreate, SceneEdgeCreate, EventCreate, TaskOutcomeCreate, FeedbackCreate, MapPatchCreate, RelationHypothesisCreate, RelationUpdateRequest
 from .sla_engine import check_task_sla
 from .feedback_engine import submit_feedback
 from .map_patch import apply_map_patch, reject_map_patch, propose_map_patch
@@ -11,12 +11,19 @@ from .metrics_engine import get_operational_metrics, get_top_risk_nodes
 from .scene_graph import upsert_node, add_edge, get_neighborhood
 from .case_engine import ingest_event_and_create_case, handle_task_outcome
 from .scheduler import run_scheduler
+from .relation_engine import (
+    upsert_relation_hypothesis,
+    confirm_relation,
+    reject_relation,
+    expire_stale_hypotheses,
+)
+from .subgraph_extractor import extract_case_subgraph
 
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
-    title="EboTech Operational Scene Graph Twin",
-    version="5.0.0"
+    title="EboTech state-aware Scene Graph",
+    version="V3.0", 
 )
 
 
