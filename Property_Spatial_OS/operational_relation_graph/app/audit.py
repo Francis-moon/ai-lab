@@ -1,4 +1,5 @@
 from sqlalchemy.orm import Session
+
 from .models import AuditLog
 
 
@@ -15,6 +16,9 @@ def write_audit(
         action=action,
         detail=detail
     )
+
     db.add(log)
     db.commit()
+    db.refresh(log)
+
     return log
