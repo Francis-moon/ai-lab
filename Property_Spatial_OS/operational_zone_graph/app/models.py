@@ -1,15 +1,68 @@
 from datetime import datetime
+
 from sqlalchemy import (
     Column,
     Integer,
     String,
     Float,
+    Boolean,
     DateTime,
-    JSON,
-    Boolean
+    JSON
 )
 
 from .database import Base
+
+
+class FunctionalZone(Base):
+    __tablename__ = "functional_zones"
+
+    id = Column(Integer, primary_key=True)
+    zone_id = Column(String, unique=True, index=True)
+
+    site_id = Column(String, default="default_site")
+    name = Column(String)
+    zone_type = Column(String, index=True)
+    # entrance / lane / fire_lane / elevator_lobby / equipment_room / parking_area / loading_area
+
+    floor = Column(String, nullable=True)
+    parent_zone_id = Column(String, nullable=True)
+
+    state = Column(String, default="normal")
+    heat = Column(Integer, default=1)
+    risk_score = Column(Float, default=0.0)
+
+    capacity = Column(Integer, default=0)
+    occupancy = Column(Integer, default=0)
+
+    boundary_polygon = Column(JSON, default=list)
+    policy = Column(JSON, default=dict)
+    attrs = Column(JSON, default=dict)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow)
+
+
+class ZoneTopologyEdge(Base):
+    __tablename__ = "zone_topology_edges"
+
+    id = Column(Integer, primary_key=True)
+
+    edge_id = Column(String, unique=True, index=True)
+    source_zone_id = Column(String, index=True)
+    target_zone_id = Column(String, index=True)
+
+    relation_type = Column(String)
+    # adjacent_to / flow_to / blocks / upstream_of / downstream_of
+
+    distance = Column(Float, default=1.0)
+    bidirectional = Column(Boolean, default=True)
+
+    state = Column(String, default="normal")
+    confidence = Column(Integer, default=100)
+
+    attrs = Column(JSON, default=dict)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
 
 
 class SceneNode(Base):
@@ -17,10 +70,11 @@ class SceneNode(Base):
 
     id = Column(Integer, primary_key=True)
     node_id = Column(String, unique=True, index=True)
-    node_type = Column(String, index=True)
 
+    node_type = Column(String, index=True)
     name = Column(String)
-    zone = Column(String, nullable=True)
+
+    zone_id = Column(String, nullable=True)
     floor = Column(String, nullable=True)
 
     x = Column(Float, nullable=True)
@@ -36,6 +90,23 @@ class SceneNode(Base):
     updated_at = Column(DateTime, default=datetime.utcnow)
 
 
+class ZoneMember(Base):
+    __tablename__ = "zone_members"
+
+    id = Column(Integer, primary_key=True)
+
+    zone_id = Column(String, index=True)
+    node_id = Column(String, index=True)
+
+    role = Column(String)
+    # anchor / sensor / executor / device / target / passage / evidence
+
+    confidence = Column(Integer, default=100)
+    attrs = Column(JSON, default=dict)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
 class SceneEdge(Base):
     __tablename__ = "scene_edges"
 
@@ -46,49 +117,14 @@ class SceneEdge(Base):
     target_node_id = Column(String, index=True)
 
     relation_type = Column(String, index=True)
-
-    relation_state = Column(String, default="hypothesis")
-    confidence = Column(Integer, default=60)
+    relation_state = Column(String, default="confirmed")
+    confidence = Column(Integer, default=100)
 
     evidence_count = Column(Integer, default=0)
-    positive_count = Column(Integer, default=0)
-    negative_count = Column(Integer, default=0)
-
-    created_by = Column(String, default="system")
-    source_event_id = Column(String, nullable=True)
-
-    last_observed_at = Column(DateTime, default=datetime.utcnow)
-    last_verified_at = Column(DateTime, nullable=True)
-
     attrs = Column(JSON, default=dict)
 
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow)
-
-
-class RelationEvidence(Base):
-    __tablename__ = "relation_evidence"
-
-    id = Column(Integer, primary_key=True)
-
-    evidence_id = Column(String, unique=True, index=True)
-    edge_id = Column(String, index=True)
-
-    signal_type = Column(String)
-    # positive / negative / neutral
-
-    source_type = Column(String)
-    # ai_box / camera / robot / human / cloud_operator / system
-
-    source_id = Column(String, nullable=True)
-    event_id = Column(String, nullable=True)
-    task_id = Column(String, nullable=True)
-    case_id = Column(String, nullable=True)
-
-    confidence_delta = Column(Integer, default=0)
-    note = Column(String, nullable=True)
-
-    created_at = Column(DateTime, default=datetime.utcnow)
 
 
 class Event(Base):
@@ -101,14 +137,12 @@ class Event(Base):
 
     source = Column(String)
     source_node_id = Column(String, nullable=True)
-
     target_node_id = Column(String, nullable=True)
-    zone = Column(String)
 
+    zone_id = Column(String, index=True)
     confidence = Column(Integer, default=60)
-    status = Column(String, default="new")
-    # new / correlated / processed / rejected
 
+    status = Column(String, default="new")
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
@@ -120,12 +154,12 @@ class Case(Base):
     case_id = Column(String, unique=True, index=True)
     case_type = Column(String, index=True)
 
+    zone_id = Column(String, index=True)
+    target_node_id = Column(String, nullable=True)
+
     state = Column(String, default="suspected")
     severity = Column(String, default="medium")
     confidence = Column(Integer, default=50)
-
-    zone = Column(String)
-    target_node_id = Column(String, nullable=True)
 
     source_event_id = Column(String)
     current_task_id = Column(String, nullable=True)
@@ -143,8 +177,8 @@ class Task(Base):
     case_id = Column(String, index=True)
 
     task_type = Column(String)
+    zone_id = Column(String, index=True)
     target_node_id = Column(String, nullable=True)
-    zone = Column(String)
 
     priority = Column(String, default="medium")
     sla_minutes = Column(Integer, default=15)
@@ -170,10 +204,8 @@ class TaskOutcome(Base):
     outcome_type = Column(String)
     confidence = Column(Integer, default=80)
 
-    evidence_url = Column(String, nullable=True)
-    evidence_node_id = Column(String, nullable=True)
-
     note = Column(String, nullable=True)
+    evidence_url = Column(String, nullable=True)
     created_by = Column(String)
 
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -186,9 +218,10 @@ class Executor(Base):
 
     executor_id = Column(String, unique=True, index=True)
     executor_type = Column(String)
-    # robot / human / cloud_operator
+    # robot / human / cloud_operator / third_party_device
 
-    zone = Column(String)
+    zone_id = Column(String, index=True)
+
     status = Column(String, default="idle")
     battery_level = Column(Integer, nullable=True)
 

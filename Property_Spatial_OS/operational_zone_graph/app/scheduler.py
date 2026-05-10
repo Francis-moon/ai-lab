@@ -1,23 +1,15 @@
 from sqlalchemy.orm import Session
 
-from .models import Task, Executor
+from .models import Task, Executor, FunctionalZone
+from .zone_graph import get_adjacent_zone_ids, update_zone_state
 from .audit import write_audit
-from .scene_graph import update_node_state, confirm_relation
 from .constants import (
     TASK_CREATED,
     TASK_ASSIGNED,
     EXECUTOR_IDLE,
     EXECUTOR_BUSY,
-    REL_ASSIGNED_TO
+    PRIORITY_SCORE
 )
-
-
-PRIORITY_SCORE = {
-    "critical": 100,
-    "high": 70,
-    "medium": 40,
-    "low": 10
-}
 
 
 def parse_chain(chain: str):
@@ -29,17 +21,26 @@ def executor_can_handle(executor: Executor, task_type: str):
     return task_type in supported
 
 
-def task_score(task: Task):
+def get_zone_heat(db: Session, zone_id: str):
+    zone = db.query(FunctionalZone).filter(
+        FunctionalZone.zone_id == zone_id
+    ).first()
+
+    return zone.heat if zone else 1
+
+
+def task_score(db: Session, task: Task):
     priority_score = PRIORITY_SCORE.get(task.priority, 0)
     sla_score = max(0, 60 - task.sla_minutes)
-    return priority_score + sla_score
+    zone_score = get_zone_heat(db, task.zone_id) * 5
+    return priority_score + sla_score + zone_score
 
 
-def find_executor(db: Session, task: Task):
+def find_executor_in_zone(db: Session, task: Task, zone_id: str):
     for executor_type in parse_chain(task.fallback_chain):
         candidates = db.query(Executor).filter(
+            Executor.zone_id == zone_id,
             Executor.executor_type == executor_type,
-            Executor.zone == task.zone,
             Executor.status == EXECUTOR_IDLE,
             Executor.online == True
         ).all()
@@ -51,22 +52,36 @@ def find_executor(db: Session, task: Task):
     return None
 
 
+def find_executor(db: Session, task: Task):
+    executor = find_executor_in_zone(db, task, task.zone_id)
+    if executor:
+        return executor, "same_zone"
+
+    for adjacent_zone_id in get_adjacent_zone_ids(db, task.zone_id):
+        executor = find_executor_in_zone(db, task, adjacent_zone_id)
+        if executor:
+            return executor, f"adjacent_zone:{adjacent_zone_id}"
+
+    return None, "no_executor"
+
+
 def run_scheduler(db: Session):
     tasks = db.query(Task).filter(
         Task.status == TASK_CREATED
     ).all()
 
-    tasks = sorted(tasks, key=task_score, reverse=True)
+    tasks = sorted(tasks, key=lambda t: task_score(db, t), reverse=True)
 
     results = []
 
     for task in tasks:
-        executor = find_executor(db, task)
+        executor, reason = find_executor(db, task)
 
         if not executor:
             results.append({
                 "task_id": task.task_id,
-                "status": "waiting_no_executor"
+                "status": "waiting_no_executor",
+                "reason": reason
             })
             continue
 
@@ -78,43 +93,21 @@ def run_scheduler(db: Session):
 
         db.commit()
 
-        update_node_state(
-            db,
-            f"task:{task.task_id}",
-            TASK_ASSIGNED,
-            confidence=100
-        )
-
-        update_node_state(
-            db,
-            f"executor:{executor.executor_id}",
-            EXECUTOR_BUSY,
-            confidence=100
-        )
-
-        confirm_relation(
-            db=db,
-            source_node_id=f"executor:{executor.executor_id}",
-            target_node_id=f"task:{task.task_id}",
-            relation_type=REL_ASSIGNED_TO,
-            confidence=100,
-            created_by="scheduler",
-            task_id=task.task_id,
-            case_id=task.case_id,
-            note="scheduler assigned executor to task"
-        )
+        update_zone_state(db, task.zone_id)
 
         write_audit(
             db,
             "task",
             task.task_id,
             "task_assigned",
-            f"executor={executor.executor_id}"
+            f"executor={executor.executor_id}, reason={reason}"
         )
 
         results.append({
             "task_id": task.task_id,
             "assigned_to": executor.executor_id,
+            "executor_zone": executor.zone_id,
+            "reason": reason,
             "status": "assigned"
         })
 
