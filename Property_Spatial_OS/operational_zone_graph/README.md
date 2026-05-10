@@ -1,6 +1,10 @@
-# operational_relation_graph(v3 ORG)
+# operational_zone_graph(v4 OZG)
 
-Operational Scene Graph = 空间对象 + 关系 + 状态 + 事件 + 任务 + 证据 + 执行反馈
+论文：Orchestrating Spatial Semantics via a Zone-Graph Paradigm for Intricate Indoor Scene Generation
+
+Operational relation Graph = 空间对象 + 关系 + 状态 + 事件 + 任务 + 证据 + 执行反馈
+
+V4 在 V3 operational_relation-graph 上增加一层 Zone as first-class operational container。
 
 ## 正确定位
 
@@ -22,6 +26,35 @@ Case状态图：某个异常 Case 当前处于 suspected / verifying / confirmed
 证据链图：图片、视频、人工备注、机器人复核结果
 反馈学习图：误报、漏报、规则错误、地图错误
 核心不是 3D 可视化，而是运营可推理。
+
+## 为什么有必要升级到 Zone-Graph
+
+核心不是“房间生成”，而是三点：
+
+从 object-centric 转向 zone-centric
+ZoneMaestro 把复杂空间看成“功能容器的拓扑图”，不是连续真空里的对象堆叠。论文明确说，Zone-Graph 让模型把高层语义意图转成 functional zones 和 topological constraints。
+先全局区域，再局部对象
+论文把场景表示成 S = (D, G, T, A)：Zone Inventory、Intra-Zone Spatial Graph、Global Topology、Architecture。也就是先定义功能区，再定义区内对象关系，再定义区间拓扑，最后落到建筑边界。
+Zone 可以吸收复杂度
+论文里说 Zone-Graph 的 semantic encapsulation 可以隔离高密度依赖，避免长链生成中的语义漂移；实验证明 Zone-Graph SFT 相比无 Zone-Graph 版本减少过度堆叠和边界漂移。
+
+宜泊的公共物业空间也有同类问题：
+车位 / 通道 / 出入口 / 消防通道 / 电梯厅 / 设备房 / 充电区 / 装卸区 / 垃圾房 / 非机动车区
+这些不是普通对象，而是运营区。不同区有不同：
+状态
+SLA
+执行体
+事件类型
+摄像头覆盖
+机器人可达性
+风险权重
+处置流程
+
+所以 V4 的必要性是：
+V3 解决“关系是否被验证”；
+V4 解决“事件属于哪个运营区，区域之间如何影响调度与闭环”。
+
+但是，论文目标是 3D indoor scene generation，宜泊目标是 property event operating system。
 
 ## 新架构：Scene Graph + Case Engine
 
@@ -100,6 +133,20 @@ V3 就有数据基础。
 V2 只能看 Case 和 Task。
 V3 可以看“关系质量”。
 
+## V4 相比 V3 的区别
+
+V2 operational_scene-graph：Event / Case / Task 状态，事件处理到哪一步？
+V3 operational_relation-graph：SceneEdge / Relation 状态，哪些关系被验证、削弱、拒绝？
+V4 operational_zone-graph：FunctionalZone / ZoneTopology，哪个区域进入什么状态？区域关系如何影响调度？
+
+V4 增加的是：
+FunctionalZone
+ZoneTopologyEdge
+ZoneMember
+Zone-aware Case
+Zone-aware Scheduler
+Zone Heat / Risk / SLA Policy
+
 ## 运行步骤
 
 python -m app.seed
@@ -108,177 +155,167 @@ uvicorn app.main:app --reload
 http://127.0.0.1:8000/docs
 测试流程
 
-1. 查看初始图
+1. 查看 Zone Graph
+
 调用：
-GET /scene/nodes
-GET /scene/edges
+GET /zones
+GET /zone-topology
+GET /zone-members
 你会看到：
-camera:A-cam-01 --observes/confirmed--> slot:A-003
-这条边现在不是普通边，而是带有：
-relation_state
-confidence
-evidence_count
-positive_count
-negative_count
-last_verified_at
+zone:entrance-A
+zone:lane-A-main
+zone:parking-A
+zone:equipment-A
 
-2. AI-BOX 上报疑似违停
+以及：
+entrance-A flow_to lane-A-main
+lane-A-main adjacent_to parking-A
+lane-A-main adjacent_to equipment-A
+
+2. 停车区违停事件
+
+调用：
 {
-  "event_id": "evt-601",
+  "event_id": "evt-701",
   "event_type": "illegal_parking_detected",
   "source": "ai_box",
   "source_node_id": "camera:A-cam-01",
   "target_node_id": "slot:A-003",
-  "zone": "A",
+  "zone_id": "zone:parking-A",
   "confidence": 65
 }
-调用：
-POST /events/ingest
 系统会：
-创建 Event
 创建 Case
-创建 remote_verify 任务
-创建/强化 event -> slot occurs_at 假设边
-创建 event -> case supports 假设边
-强化 camera -> slot observes 边
+读取 parking-A 的 zone policy
+生成 remote_verify
+更新 parking-A heat / state
 
-3. 运行调度器
+3. 调度器运行
+
 POST /scheduler/run
-remote_verify 会派给 cloud-A-1。
-同时会生成关系边：
-executor:cloud-A-1 --assigned_to/confirmed--> task:xxx
+如果 parking-A 没有合适执行体，调度器会查相邻 Zone：
+parking-A → lane-A-main
+因此 robot-A-1 或 human-A-1 仍可接单。
+这就是 Zone-Graph 的实际价值：
+调度不是只看执行体类型，而是看执行体所在 Zone 与目标 Zone 的拓扑关系。
 
-4. 提交远程确认结果：低置信度
-把实际任务 ID 复制出来，调用：
-{
-  "outcome_id": "out-601-1",
-  "task_id": "实际 remote_verify 任务ID",
-  "outcome_type": "low_confidence",
-  "confidence": 60,
-  "note": "画面模糊，需要机器人复核",
-  "created_by": "cloud_operator"
-}
-调用：
-POST /tasks/outcome
-系统会动态生成：
-robot_recheck
-并且不会关闭 Case。
+4. 查看区域上下文
 
-5. 提交机器人复核结果：仍存在
-先运行调度器：
-POST /scheduler/run
-然后提交：
-{
-  "outcome_id": "out-601-2",
-  "task_id": "实际 robot_recheck 任务ID",
-  "outcome_type": "still_present",
-  "confidence": 92,
-  "evidence_url": "mock://robot-image-001.jpg",
-  "note": "机器人确认车辆仍在异常位置",
-  "created_by": "robot"
-}
-系统会：
-确认 robot -> case verified 边
-确认 case -> slot affects 边
-更新 slot:A-003 state = illegal
-生成 capture_evidence 任务
-这就是 V3 的关键：
-不只是 Case 状态变化，关系边也被确认。
+GET /zones/zone:parking-A/context
+返回：
+zone
+members
+nodes
+adjacent_zones
+open_cases
+open_tasks
+这就是最小版 Case-relevant Zone Subgraph。
 
-6. 测试误报剪枝
-新建另一个事件后，如果远程确认：
-{
-  "outcome_id": "out-602-1",
-  "task_id": "实际 remote_verify 任务ID",
-  "outcome_type": "false_alarm",
-  "confidence": 90,
-  "note": "坐席确认误报",
-  "created_by": "cloud_operator"
-}
-系统会：
-reject event -> case supports 边
-weaken event -> slot occurs_at 边
-slot 状态回 normal
-case closed
-这就是 MomaGraph 式 state-aware 的最小工程化实现：
-任务结果 → 更新状态 + 更新关系边
+## V2核心点
 
-## V2测试
+1. Event Correlation 比 Dedup 更重要
+Dedup 只解决重复报警。
+Correlation 解决的是：
+不同设备、不同时间、不同视角的事件，是否在支持同一个 Case。
+这对宜泊非常关键，因为云岗亭、AI-BOX、机器人、人工作业本来就是多入口事件源。
 
-1. 事件关联测试
-先发一个 AI-BOX 事件：
-{
-  "event_id": "evt-501",
-  "event_type": "illegal_parking_detected",
-  "source": "ai_box",
-  "source_node_id": "camera:A-cam-01",
-  "target_node_id": "slot:A-003",
-  "zone": "A",
-  "confidence": 65
-}
-再发一个机器人复核事件：
-{
-  "event_id": "evt-502",
-  "event_type": "illegal_parking_detected",
-  "source": "robot",
-  "source_node_id": "robot:robot-A-1",
-  "target_node_id": "slot:A-003",
-  "zone": "A",
-  "confidence": 92
-}
-预期：
-evt-502 不新建 Case
-而是 correlated 到 evt-501 创建的 Case
-Case confidence 上升
+2. Confidence Fusion 是降低误报的基础
 
-2. SLA 测试
-把某个任务的 sla_minutes 改成很小，例如 0 或 1。
-等待后调用：
-POST /sla/check
-预期：
-任务 priority 变 critical
-Case state 变 escalated
-生成 SLA violation
+AI-BOX 单帧告警不能直接变成强 Case。
+机器人近距离复核、人工确认、云岗亭远程确认的权重应该不同。
+所以系统应有：
+source weight
++ evidence confidence
++ outcome feedback
+而不是简单相信某一个算法输出。
 
-3. 反馈测试
-关闭一个 Case 后提交：
-{
-  "feedback_id": "fb-001",
-  "case_id": "case-evt-501",
-  "task_id": null,
-  "feedback_type": "false_positive",
-  "root_cause": "camera_angle",
-  "note": "摄像头角度导致误判",
-  "created_by": "operator",
-  "attrs": {
-    "camera_id": "camera:A-cam-01"
-  }
-}
-预期：
-生成 feedback
-更新 risk_profile
-如果是 map_error / camera_blindspot，会生成 map_patch
+3. Policy Engine 是产品化的关键
 
-4. 地图 patch 测试
-提交：
-{
-  "patch_id": "patch-test-001",
-  "target_node_id": "camera:A-cam-01",
-  "patch_type": "mark_blindspot",
-  "payload": {
-    "note": "摄像头被柱子遮挡"
-  },
-  "source_case_id": "case-evt-501",
-  "proposed_by": "operator"
-}
-然后调用：
-POST /map-patches/patch-test-001/apply
-预期：
-camera:A-cam-01 的 attrs 增加 blindspot=true
+不要长期把业务规则写死在 if-else 里。
+第一阶段可以用 Python dict。
+第二阶段应进入数据库配置。
+第三阶段再做可视化规则台。
+最终形态：
+case_type + task_type + outcome_type → next_state + next_task + SLA + fallback
+这是宜泊未来“可复制交付”的关键。
 
-## 核心点
+4. SLA Engine 决定客户是否感知价值
 
-### Scene Graph 是 Operational Twin 的“空间记忆”
+客户不只关心系统是否发现异常。
+客户更关心：
+多久响应？
+有没有超时？
+谁处理？
+是否复核？
+是否闭环？
+没有 SLA 引擎，系统很难从“告警平台”升级为“运营平台”。
+
+5. Feedback Engine 决定系统能否变准
+
+Operational Twin 不是一次性建成的。
+它靠真实处置结果持续校正：
+误报 → 调低规则权重
+地图错 → 生成 Map Patch
+摄像头盲区 → 标记 blindspot
+重复事件 → 优化 correlation
+SLA 超时 → 优化调度策略
+这就是“越跑越懂场”的壁垒。
+
+6. Map Patch 是轻量地图进化机制
+
+不要一开始追求完美地图。
+应该允许系统在运营中产生 patch：
+摄像头盲区
+车位边界错误
+通道关系错误
+机器人不可达点
+高风险区域
+地图不是画出来的，是运营出来的。
+
+7. Risk Profile 是从单事件走向区域运营
+
+当你积累足够反馈后，系统就可以回答：
+哪个车位最常误报？
+哪个通道最常堵？
+哪个摄像头最不可靠？
+哪个区域最容易超 SLA？
+哪个执行体最容易失败？
+这比单个 Case 更有经营价值。
+
+8. 下一步研发路线
+
+V2：现在这版
+Operational Scene Graph
++ Case Engine
++ Dynamic Policy
++ SLA
++ Feedback
++ Map Patch
+目标：跑通单项目闭环。
+
+### 产品化版
+
+规则配置后台
+人工审核台
+证据链管理
+项目级指标看板
+多项目模板复制
+目标：可交付给真实物业项目。
+
+### 平台化版
+
+图数据库 Neo4j / NebulaGraph
+PostGIS 空间查询
+Kafka / Redis Stream 事件流
+策略 A/B Test
+跨项目规则迁移
+调度仿真
+
+目标：形成宜泊自己的 property event operating system
+
+## V3 核心点
+
+1. Scene Graph 是 Operational Twin 的“空间记忆”
 
 以前你只有表：
 Event / Task / Executor
@@ -291,7 +328,7 @@ Task produces Evidence
 Robot operates_in Zone
 这让系统不只是存数据，而是能推理关系。
 
-### 3D Scene Graph 不等于 3D 大屏
+2. 3D Scene Graph 不等于 3D 大屏
 
 宜泊最不应该做的是：
 先做漂亮3D展示
@@ -308,7 +345,7 @@ Robot operates_in Zone
 最后状态如何
 这比可视化重要得多。
 
-### Case Engine 是 Scene Graph 的“动态状态机”
+3. Case Engine 是 Scene Graph 的“动态状态机”
 
 Scene Graph 负责表达：
 空间和关系
@@ -318,7 +355,7 @@ Case Engine 负责表达：
 suspected → verifying → confirmed → waiting → closed
 不要把这两个系统混淆。
 
-### 任务不是链，而是由 Outcome 驱动
+4. 任务不是链，而是由 Outcome 驱动
 
 正确逻辑：
 Task Outcome → Decision Gateway → Next Task / Close Case / Escalate
@@ -326,7 +363,7 @@ Task Outcome → Decision Gateway → Next Task / Close Case / Escalate
 Task1 → Task2 → Task3
 这是从工单系统升级为运营系统的关键。
 
-### 宜泊应该优先做 2.5D Operational Scene Graph
+5. 宜泊应该优先做 2.5D Operational Scene Graph
 
 不建议一开始做重型 3D Scene Graph。
 第一阶段应该是：
@@ -344,106 +381,71 @@ Zone / Lane / Slot / Camera / Robot / Entrance
 提 SLA
 可复制交付
 
-## V2核心点
+## V4 核心点
 
-### Event Correlation 比 Dedup 更重要
+1. Zone 不再只是普通 SceneNode
+在 V3 中，zone:A 更像一个节点。
+在 V4 中，Zone 是运营容器：
+状态
+热度
+风险
+容量
+占用
+SLA policy
+边界
+成员对象
+邻接拓扑
+这是质变。
 
-Dedup 只解决重复报警。
-Correlation 解决的是：
-不同设备、不同时间、不同视角的事件，是否在支持同一个 Case。
-这对宜泊非常关键，因为云岗亭、AI-BOX、机器人、人工作业本来就是多入口事件源。
-
-### Confidence Fusion 是降低误报的基础
-
-AI-BOX 单帧告警不能直接变成强 Case。
-机器人近距离复核、人工确认、云岗亭远程确认的权重应该不同。
-所以系统应有：
-source weight
-+ evidence confidence
-+ outcome feedback
-而不是简单相信某一个算法输出。
-
-### Policy Engine 是产品化的关键
-
-不要长期把业务规则写死在 if-else 里。
-第一阶段可以用 Python dict。
-第二阶段应进入数据库配置。
-第三阶段再做可视化规则台。
-最终形态：
-case_type + task_type + outcome_type → next_state + next_task + SLA + fallback
-这是宜泊未来“可复制交付”的关键。
-
-### SLA Engine 决定客户是否感知价值
-
-客户不只关心系统是否发现异常。
-客户更关心：
-多久响应？
-有没有超时？
-谁处理？
-是否复核？
-是否闭环？
-没有 SLA 引擎，系统很难从“告警平台”升级为“运营平台”。
-
-### Feedback Engine 决定系统能否变准
-
-Operational Twin 不是一次性建成的。
-它靠真实处置结果持续校正：
-误报 → 调低规则权重
-地图错 → 生成 Map Patch
-摄像头盲区 → 标记 blindspot
-重复事件 → 优化 correlation
-SLA 超时 → 优化调度策略
-这就是“越跑越懂场”的壁垒。
-
-### Map Patch 是轻量地图进化机制
-
-不要一开始追求完美地图。
-应该允许系统在运营中产生 patch：
-摄像头盲区
-车位边界错误
-通道关系错误
-机器人不可达点
-高风险区域
-地图不是画出来的，是运营出来的。
-
-### Risk Profile 是从单事件走向区域运营
-
-当你积累足够反馈后，系统就可以回答：
-哪个车位最常误报？
-哪个通道最常堵？
-哪个摄像头最不可靠？
-哪个区域最容易超 SLA？
-哪个执行体最容易失败？
-这比单个 Case 更有经营价值。
-
-## 下一步研发路线
-
-V2：现在这版
-Operational Scene Graph
-+ Case Engine
-+ Dynamic Policy
+2. 调度开始 Zone-aware
+V3 调度主要是：
+task type + executor type + executor status
+V4 调度变成：
+task zone
++ zone heat
++ zone policy
++ executor zone
++ adjacent zone topology
 + SLA
-+ Feedback
-+ Map Patch
-目标：跑通单项目闭环。
+这更接近真实物业调度。
 
-V3：产品化版
-规则配置后台
-人工审核台
-证据链管理
-项目级指标看板
-多项目模板复制
-目标：可交付给真实物业项目。
+3. Zone 抑制图爆炸
+你之前担心 node 太多太细。
+Zone-Graph 正好解决这个问题。
+不是让所有对象都进入全局推理，而是：
+先找 Zone
+再取 Zone context
+再取相关对象
+再生成任务
+也就是：
+全图 → 区域子图 → Case 子图
 
-V4：平台化版
-图数据库 Neo4j / NebulaGraph
-PostGIS 空间查询
-Kafka / Redis Stream 事件流
-策略 A/B Test
-跨项目规则迁移
-调度仿真
+4. 宜泊的公共空间天然是 Zone-first
+物业客户不关心“某个 bounding box”。
+他们关心：
+入口是否堵？
+消防通道是否被占？
+电梯厅是否异常停留？
+设备房是否故障？
+装卸区是否被占用？
+非机动车区是否溢出？
+这些都是 Zone-level 状态。
 
-目标：形成宜泊自己的 property event operating system
+5. V4 是必要升级，但不是最高优先级全部重构
+建议研发节奏：
+V3 保留：关系状态、证据、Case Engine
+V4 增加：FunctionalZone、ZoneTopology、Zone-aware Scheduler
+不要重写：不要做生成式 ZoneMaestro / Z-GRPO
+
+## 最终判断
+
+如果宜泊只做停车场违停/设备告警，V3 足够。
+如果宜泊要进入物业公共空间，V4 有必要。
+原因很简单：
+物业公共空间不是“对象集合”，而是“功能区域集合”。
+运营动作不是围绕单个检测框，而是围绕区域状态、区域拓扑、区域 SLA 和区域执行资源。
+所以 V4 operational_zone-graph 是合理升级。
+但它必须是轻量运营 Zone-Graph，不是论文里的完整生成式 3D Zone-Graph。
 
 ## 宜泊真正的壁垒
 
